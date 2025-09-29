@@ -156,6 +156,8 @@ name = "aurora-data"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "approx",
+ "async-trait",
  "aurora-core",
  "clap",
  "csv",
