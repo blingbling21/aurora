@@ -1,0 +1,10 @@
+[package]
+name = "aurora-indicators"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aurora-core = { path = "../aurora-core" }
+
+[dev-dependencies]
+approx = "0.5"  # For floating point comparisons in tests
