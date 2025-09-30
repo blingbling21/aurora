@@ -1,0 +1,15 @@
+[package]
+name = "aurora-portfolio"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aurora-core = { path = "../aurora-core" }
+serde = { version = "1.0", features = ["derive"] }
+async-trait = "0.1"
+tracing = "0.1"
+anyhow = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["full"] }
+serde_json = "1.0"

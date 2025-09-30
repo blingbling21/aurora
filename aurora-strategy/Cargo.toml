@@ -6,3 +6,7 @@ edition = "2024"
 [dependencies]
 aurora-core = { path = "../aurora-core" }
 aurora-indicators = { path = "../aurora-indicators" }
+
+[dev-dependencies]
+approx = "0.5"
+tokio = { version = "1.0", features = ["full"] }

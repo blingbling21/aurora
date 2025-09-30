@@ -1,6 +1,6 @@
 use aurora_core::{Kline, MarketEvent, Signal, Strategy};
 use aurora_strategy::MACrossoverStrategy;
-use crate::portfolio::Portfolio;
+use aurora_portfolio::{Portfolio, BasePortfolio};
 use anyhow::{Result, anyhow};
 use std::path::Path;
 use tracing::{info, debug, error};
@@ -66,7 +66,7 @@ fn load_klines_from_csv(file_path: &str) -> Result<Vec<Kline>> {
 /// 回测引擎
 pub struct BacktestEngine {
     strategy: MACrossoverStrategy,
-    portfolio: Portfolio,
+    portfolio: BasePortfolio,
 }
 
 impl BacktestEngine {
@@ -74,7 +74,7 @@ impl BacktestEngine {
     pub fn new(strategy: MACrossoverStrategy, initial_cash: f64) -> Self {
         Self {
             strategy,
-            portfolio: Portfolio::new(initial_cash),
+            portfolio: BasePortfolio::new(initial_cash),
         }
     }
 
@@ -98,10 +98,14 @@ impl BacktestEngine {
                 // 执行交易信号
                 match signal_event.signal {
                     Signal::Buy => {
-                        self.portfolio.execute_buy(signal_event.price, signal_event.timestamp);
+                        if let Err(e) = self.portfolio.execute_buy(signal_event.price, signal_event.timestamp).await {
+                            debug!("买入失败: {}", e);
+                        }
                     }
                     Signal::Sell => {
-                        self.portfolio.execute_sell(signal_event.price, signal_event.timestamp);
+                        if let Err(e) = self.portfolio.execute_sell(signal_event.price, signal_event.timestamp).await {
+                            debug!("卖出失败: {}", e);
+                        }
                     }
                     Signal::Hold => {
                         // 不做任何操作
@@ -110,7 +114,7 @@ impl BacktestEngine {
             }
 
             // 更新权益曲线
-            self.portfolio.update_equity_curve(kline.timestamp, kline.close);
+            self.portfolio.update_equity(kline.timestamp, kline.close);
 
             processed_count += 1;
             
@@ -124,14 +128,23 @@ impl BacktestEngine {
 
         info!("回测完成，处理了 {} 条K线数据", processed_count);
         
-        // 打印回测报告
-        self.portfolio.print_report();
+        // 计算并打印回测报告
+        let time_period_days = if !klines.is_empty() {
+            let start_time = klines.first().unwrap().timestamp;
+            let end_time = klines.last().unwrap().timestamp;
+            (end_time - start_time) as f64 / (24.0 * 60.0 * 60.0 * 1000.0)
+        } else {
+            1.0
+        };
+        
+        let metrics = self.portfolio.calculate_performance(time_period_days);
+        metrics.print_report();
 
         Ok(())
     }
 
     /// 获取投资组合的引用
-    pub fn portfolio(&self) -> &Portfolio {
+    pub fn portfolio(&self) -> &BasePortfolio {
         &self.portfolio
     }
 }
@@ -141,9 +154,9 @@ mod tests {
     use super::*;
     use std::fs::File;
     use std::io::Write;
-    use tempfile::tempdir;
+    use tempfile::{tempdir, TempDir};
 
-    fn create_test_csv() -> Result<String> {
+    fn create_test_csv() -> Result<(String, TempDir)> {
         let dir = tempdir()?;
         let file_path = dir.path().join("test_data.csv");
         let mut file = File::create(&file_path)?;
@@ -155,12 +168,12 @@ mod tests {
         writeln!(file, "1640995380000,51500.0,52500.0,51000.0,52000.0,130.0")?;
         writeln!(file, "1640995440000,52000.0,53000.0,51500.0,52500.0,125.0")?;
 
-        Ok(file_path.to_string_lossy().to_string())
+        Ok((file_path.to_string_lossy().to_string(), dir))
     }
 
     #[test]
     fn test_load_klines_from_csv() {
-        let csv_path = create_test_csv().unwrap();
+        let (csv_path, _temp_dir) = create_test_csv().unwrap();
         let klines = load_klines_from_csv(&csv_path).unwrap();
         
         assert_eq!(klines.len(), 5);
@@ -168,13 +181,12 @@ mod tests {
         assert_eq!(klines[0].close, 50500.0);
         assert_eq!(klines[4].close, 52500.0);
         
-        // 清理临时文件
-        std::fs::remove_file(&csv_path).ok();
+        // _temp_dir 在这里自动清理
     }
 
     #[tokio::test]
     async fn test_backtest_engine() {
-        let csv_path = create_test_csv().unwrap();
+        let (csv_path, _temp_dir) = create_test_csv().unwrap();
         let klines = load_klines_from_csv(&csv_path).unwrap();
         
         let strategy = MACrossoverStrategy::new(2, 3);
@@ -185,10 +197,9 @@ mod tests {
         
         // 验证投资组合状态
         let portfolio = engine.portfolio();
-        assert!(!portfolio.equity_curve().is_empty());
+        assert!(!portfolio.get_equity_curve().is_empty());
         
-        // 清理临时文件
-        std::fs::remove_file(&csv_path).ok();
+        // _temp_dir 在这里自动清理
     }
 
     #[test]

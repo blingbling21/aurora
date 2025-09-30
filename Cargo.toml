@@ -5,6 +5,7 @@ members = [
     "aurora-data",      # 数据采集模块
     "aurora-indicators",# 技术指标库
     "aurora-strategy",  # 策略逻辑
+    "aurora-portfolio", # 投资组合管理
     "aurora-backtester",# 回测引擎
     "aurora-live"       # 实时模拟交易引擎
 ]

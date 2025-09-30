@@ -9,11 +9,18 @@
 //! - **实时数据流**: 通过WebSocket连接获取实时市场数据
 //! - **数据存储**: 将获取的数据保存为CSV格式
 //! - **数据验证**: 确保数据的完整性和有效性
+//! - **数据加载**: 从各种格式加载历史数据
 //! 
 //! ## 支持的数据源
 //! 
 //! - **Binance**: 支持REST API和WebSocket
 //! - 可扩展支持其他交易所
+//! 
+//! ## 模块组织
+//! 
+//! - `historical`: 历史数据获取
+//! - `live`: 实时数据流
+//! - `loader`: 数据加载器
 //! 
 //! ## 使用示例
 //! 
@@ -100,6 +107,14 @@ pub enum DataError {
     /// 在读写文件时发生错误
     IoError(String),
     
+    /// 文件未找到错误
+    /// 当指定的文件不存在时触发
+    FileNotFound(String),
+    
+    /// 无效数据错误
+    /// 当数据内容无效或为空时触发
+    InvalidData(String),
+    
     /// 配置错误
     /// 当传入的参数或配置无效时触发
     ConfigError(String),
@@ -116,6 +131,8 @@ impl fmt::Display for DataError {
             DataError::ApiError(msg) => write!(f, "API错误: {}", msg),
             DataError::ParseError(msg) => write!(f, "数据解析错误: {}", msg),
             DataError::IoError(msg) => write!(f, "文件操作错误: {}", msg),
+            DataError::FileNotFound(msg) => write!(f, "文件未找到: {}", msg),
+            DataError::InvalidData(msg) => write!(f, "无效数据: {}", msg),
             DataError::ConfigError(msg) => write!(f, "配置错误: {}", msg),
             DataError::WebSocketError(msg) => write!(f, "WebSocket错误: {}", msg),
         }
@@ -128,6 +145,11 @@ impl Error for DataError {}
 /// 
 /// 这是一个便利类型别名，用于所有可能返回错误的数据操作。
 pub type DataResult<T> = Result<T, DataError>;
+
+// 声明子模块
+pub mod historical;
+pub mod live;
+pub mod loader;
 
 /// 通用的数据源配置
 /// 
@@ -331,10 +353,7 @@ mod tests {
     }
 }
 
-// 内部模块声明
-pub mod historical;
-pub mod live;
-
 // 重新导出主要的公共类型和函数
 pub use historical::BinanceHistoricalDownloader;
 pub use live::BinanceLiveStream;
+pub use loader::CsvDataLoader;

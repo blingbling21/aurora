@@ -1,38 +1,9 @@
-//! # 实时数据流模块
+//! # 实时数据流实现
 //! 
-//! 这个模块提供实时市场数据流的获取功能。主要通过WebSocket连接
-//! 从交易所获取实时的K线数据、交易数据等市场信息。
-//! 
-//! ## 功能特性
-//! 
-//! - **WebSocket连接**: 维持与交易所的WebSocket连接
-//! - **实时K线**: 获取实时更新的K线数据
-//! - **自动重连**: 连接断开时自动重连
-//! - **数据过滤**: 只处理完成的K线数据
-//! - **错误处理**: 完整的连接和数据错误处理
-//! 
-//! ## 使用示例
-//! 
-//! ```rust,no_run
-//! use aurora_data::BinanceLiveStream;
-//! use aurora_core::DataSource;
-//! 
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let mut stream = BinanceLiveStream::new();
-//! 
-//! // 连接到实时数据流
-//! stream.connect(&["BTCUSDT", "ETHUSDT"]).await?;
-//! 
-//! // 接收数据
-//! while let Some(kline) = stream.next_kline().await? {
-//!     println!("收到K线: 价格 {}, 成交量 {}", kline.close, kline.volume);
-//! }
-//! # Ok(())
-//! # }
-//! ```
+//! 包含了Binance实时数据流的具体实现。
 
 use aurora_core::{Kline, DataSource, MarketEvent};
-use crate::{DataError, DataResult, DataSourceConfig};
+use crate::{DataSourceConfig, DataError, DataResult};
 use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
 use tokio_tungstenite::{connect_async, tungstenite::Message, WebSocketStream, MaybeTlsStream};
@@ -40,37 +11,40 @@ use tokio::net::TcpStream;
 use std::collections::VecDeque;
 use tracing::{info, error, debug, warn};
 use std::time::Duration;
-use anyhow;
 use tokio::sync::mpsc::UnboundedReceiver;
 use async_trait::async_trait;
 
 /// Binance实时数据流
 /// 
 /// 这个结构体提供了从Binance WebSocket获取实时市场数据的功能。
-/// 它维护WebSocket连接，处理实时数据，并提供统一的API接口。
+/// 支持K线数据的实时订阅和自动重连。
 /// 
 /// ## 功能特性
 /// 
-/// - **多交易对订阅**: 可以同时订阅多个交易对的数据
+/// - **WebSocket连接**: 维持与交易所的WebSocket连接
+/// - **实时K线**: 获取实时更新的K线数据
 /// - **自动重连**: 连接断开时自动重连
-/// - **数据缓存**: 内部缓存接收到的数据
-/// - **错误恢复**: 完整的错误处理和恢复机制
+/// - **数据过滤**: 只处理完成的K线数据
+/// - **错误处理**: 完整的连接和数据错误处理
 /// 
-/// ## 生命周期
+/// ## 使用示例
 /// 
-/// 1. 创建实例
-/// 2. 连接到WebSocket
-/// 3. 订阅交易对
-/// 4. 接收实时数据
-/// 5. 处理连接错误和重连
-/// 
-/// ## 示例
-/// 
-/// ```rust
+/// ```rust,no_run
 /// use aurora_data::BinanceLiveStream;
+/// use aurora_core::DataSource;
 /// 
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let mut stream = BinanceLiveStream::new();
-/// // 使用 connect 和 next_kline 方法
+/// 
+/// // 连接到实时数据流
+/// stream.connect(&["BTCUSDT", "ETHUSDT"]).await?;
+/// 
+/// // 接收数据
+/// while let Some(kline) = stream.next_kline().await? {
+///     println!("收到K线: 价格 {}, 成交量 {}", kline.close, kline.volume);
+/// }
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct BinanceLiveStream {
@@ -429,7 +403,7 @@ impl BinanceLiveStream {
         };
         
         // 验证数据有效性
-        if !self.validate_kline(&kline) {
+        if !super::utils::validate_kline(&kline) {
             return Err(DataError::ParseError("K线数据验证失败".to_string()));
         }
         
@@ -437,42 +411,6 @@ impl BinanceLiveStream {
               kline.timestamp, kline.open, kline.high, kline.low, kline.close, kline.volume);
         
         Ok(kline)
-    }
-    
-    /// 验证K线数据的有效性
-    /// 
-    /// 检查K线数据是否符合基本的有效性要求。
-    /// 
-    /// # 参数
-    /// 
-    /// * `kline` - 待验证的K线数据
-    /// 
-    /// # 返回值
-    /// 
-    /// 如果数据有效返回true，否则返回false
-    fn validate_kline(&self, kline: &Kline) -> bool {
-        // 基本数据验证
-        if kline.high < kline.low {
-            warn!("无效K线: 最高价 {} 小于最低价 {}", kline.high, kline.low);
-            return false;
-        }
-        
-        if kline.open < 0.0 || kline.high < 0.0 || kline.low < 0.0 || kline.close < 0.0 {
-            warn!("无效K线: 包含负价格");
-            return false;
-        }
-        
-        if kline.volume < 0.0 {
-            warn!("无效K线: 成交量为负数");
-            return false;
-        }
-        
-        if kline.timestamp <= 0 {
-            warn!("无效K线: 时间戳无效");
-            return false;
-        }
-        
-        true
     }
 }
 
@@ -541,120 +479,5 @@ impl DataSource for BinanceLiveStream {
     }
 }
 
-/// 接收实时数据流的便利函数
-/// 
-/// 这是一个向后兼容的函数，提供了简单的接口来接收实时数据。
-/// 建议在新代码中使用BinanceLiveStream结构体。
-/// 
-/// # 参数
-/// 
-/// * `symbol` - 交易对符号
-/// * `stream_type` - 流类型（"kline" 或 "trade"）
-/// * `interval` - K线时间间隔（仅对kline类型有效）
-/// 
-/// # 返回值
-/// 
-/// 成功时返回()，失败时返回anyhow::Result错误
-/// 
-/// # 示例
-/// 
-/// ```rust,no_run
-/// use aurora_data::live::stream_data;
-/// 
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// stream_data("BTCUSDT", "kline", "1m").await?;
-/// # Ok(())
-/// # }
-/// ```
-pub async fn stream_data(symbol: &str, stream_type: &str, interval: &str) -> anyhow::Result<()> {
-    match stream_type {
-        "kline" => {
-            let mut stream = BinanceLiveStream::new();
-            stream.set_interval(interval);
-            stream.connect(&[symbol]).await
-                .map_err(|e| anyhow::anyhow!("连接失败: {}", e))?;
-            
-            loop {
-                match stream.next_kline().await {
-                    Ok(Some(kline)) => {
-                        info!("📊 K线数据: 时间={}, 价格={}, 成交量={}", 
-                              kline.timestamp, kline.close, kline.volume);
-                    }
-                    Ok(None) => {
-                        info!("连接已关闭");
-                        break;
-                    }
-                    Err(e) => {
-                        error!("获取数据错误: {}", e);
-                        break;
-                    }
-                }
-            }
-        }
-        "trade" => {
-            return Err(anyhow::anyhow!("trade流类型暂未实现"));
-        }
-        _ => {
-            return Err(anyhow::anyhow!("不支持的流类型: {}", stream_type));
-        }
-    }
-    
-    Ok(())
-}
-
-
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[test]
-    fn test_process_kline_message() {
-        let test_message = r#"{
-            "e": "kline",
-            "E": 123456789,
-            "s": "BTCUSDT",
-            "k": {
-                "t": 1640995200000,
-                "T": 1640995259999,
-                "s": "BTCUSDT",
-                "i": "1m",
-                "f": 100,
-                "L": 200,
-                "o": "50000.00",
-                "c": "50500.00",
-                "h": "51000.00",
-                "l": "49000.00",
-                "v": "100.0",
-                "n": 100,
-                "x": true,
-                "q": "5050000.0",
-                "V": "50.0",
-                "Q": "2525000.0"
-            }
-        }"#;
-        
-        let result = process_kline_message(test_message);
-        assert!(result.is_ok());
-    }
-    
-    #[test]
-    fn test_process_trade_message() {
-        let test_message = r#"{
-            "e": "trade",
-            "E": 123456789,
-            "s": "BTCUSDT",
-            "t": 12345,
-            "p": "50000.00",
-            "q": "0.001",
-            "b": 88,
-            "a": 50,
-            "T": 1640995200000,
-            "m": false,
-            "M": true
-        }"#;
-        
-        let result = process_trade_message(test_message);
-        assert!(result.is_ok());
-    }
-}
+mod tests;  // 外部测试模块

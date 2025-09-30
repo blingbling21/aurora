@@ -3,7 +3,6 @@ use tracing::{info, error};
 use anyhow::Result;
 
 mod engine;
-mod portfolio;
 
 #[derive(Parser)]
 #[command(name = "aurora-backtester")]
@@ -57,4 +56,143 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn test_cli_default_values() {
+        let args = vec![
+            "aurora-backtester",
+            "--data-path", "test.csv"
+        ];
+        
+        let cli = Cli::try_parse_from(args).unwrap();
+        
+        // 验证默认值
+        assert_eq!(cli.data_path, "test.csv");
+        assert_eq!(cli.strategy_name, "ma-crossover");
+        assert_eq!(cli.short, 10);
+        assert_eq!(cli.long, 30);
+        assert_eq!(cli.initial_cash, 10000.0);
+    }
+
+    #[test]
+    fn test_cli_custom_values() {
+        let args = vec![
+            "aurora-backtester",
+            "--data-path", "custom.csv",
+            "--strategy-name", "custom-strategy",
+            "--short", "5",
+            "--long", "20",
+            "--initial-cash", "50000.0"
+        ];
+        
+        let cli = Cli::try_parse_from(args).unwrap();
+        
+        // 验证自定义值
+        assert_eq!(cli.data_path, "custom.csv");
+        assert_eq!(cli.strategy_name, "custom-strategy");
+        assert_eq!(cli.short, 5);
+        assert_eq!(cli.long, 20);
+        assert_eq!(cli.initial_cash, 50000.0);
+    }
+
+    #[test]
+    fn test_cli_short_args() {
+        let args = vec![
+            "aurora-backtester",
+            "-d", "short.csv",
+            "-s", "test-strategy"
+        ];
+        
+        let cli = Cli::try_parse_from(args).unwrap();
+        
+        // 验证短参数
+        assert_eq!(cli.data_path, "short.csv");
+        assert_eq!(cli.strategy_name, "test-strategy");
+    }
+
+    #[test]
+    fn test_cli_missing_required_args() {
+        let args = vec!["aurora-backtester"];
+        
+        let result = Cli::try_parse_from(args);
+        
+        // 应该失败，因为缺少必需的data-path参数
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cli_invalid_number_args() {
+        let args = vec![
+            "aurora-backtester",
+            "--data-path", "test.csv",
+            "--short", "invalid"
+        ];
+        
+        let result = Cli::try_parse_from(args);
+        
+        // 应该失败，因为short参数不是有效数字
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cli_negative_values() {
+        let args = vec![
+            "aurora-backtester",
+            "--data-path", "test.csv",
+            "--short", "5",
+            "--long", "10",
+            "--initial-cash", "-1000.0"
+        ];
+        
+        let cli = Cli::try_parse_from(args);
+        
+        // 虽然解析可能成功，但负值应该在业务逻辑中处理
+        if let Ok(parsed_cli) = cli {
+            assert_eq!(parsed_cli.initial_cash, -1000.0);
+        }
+    }
+
+    #[test]
+    fn test_cli_help_message() {
+        let args = vec!["aurora-backtester", "--help"];
+        
+        let result = Cli::try_parse_from(args);
+        
+        // 应该失败，因为--help会导致程序退出
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cli_version_message() {
+        let args = vec!["aurora-backtester", "--version"];
+        
+        let result = Cli::try_parse_from(args);
+        
+        // 应该失败，因为--version会导致程序退出
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cli_extreme_values() {
+        let args = vec![
+            "aurora-backtester",
+            "--data-path", "test.csv",
+            "--short", "1",
+            "--long", "1000",
+            "--initial-cash", "999999999.99"
+        ];
+        
+        let cli = Cli::try_parse_from(args).unwrap();
+        
+        // 验证极值处理
+        assert_eq!(cli.short, 1);
+        assert_eq!(cli.long, 1000);
+        assert_eq!(cli.initial_cash, 999999999.99);
+    }
 }

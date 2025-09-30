@@ -1,5 +1,6 @@
 use aurora_core::{MarketEvent, Signal, Strategy};
 use aurora_strategy::MACrossoverStrategy;
+use aurora_portfolio::Portfolio;
 use crate::paper_trader::PaperTrader;
 use anyhow::{Result, anyhow};
 use futures_util::{SinkExt, StreamExt};
@@ -52,19 +53,39 @@ impl LiveEngine {
     /// 运行实时引擎
     pub async fn run(&mut self, symbol: &str, interval: &str) -> Result<()> {
         let stream_name = format!("{}@kline_{}", symbol.to_lowercase(), interval);
-        let url = format!("wss://stream.binance.com:9443/ws/{}", stream_name);
         
-        info!("连接到WebSocket: {}", url);
+        // 尝试多个 Binance WebSocket 端点
+        let endpoints = [
+            "wss://stream.binance.com:9443",
+            "wss://stream.binance.com:443", 
+        ];
+        
+        let mut current_endpoint = 0;
+        let mut consecutive_failures = 0;
         
         loop {
+            let url = format!("{}/ws/{}", endpoints[current_endpoint], stream_name);
+            info!("尝试连接到WebSocket端点 {}: {}", current_endpoint + 1, url);
+            
             match self.connect_and_trade(&url).await {
                 Ok(_) => {
                     info!("WebSocket连接正常结束");
+                    consecutive_failures = 0;
                     break;
                 }
                 Err(e) => {
                     error!("WebSocket连接错误: {}", e);
-                    info!("5秒后尝试重连...");
+                    consecutive_failures += 1;
+                    
+                    // 如果当前端点连续失败3次，尝试下一个端点
+                    if consecutive_failures >= 3 {
+                        current_endpoint = (current_endpoint + 1) % endpoints.len();
+                        consecutive_failures = 0;
+                        info!("切换到下一个端点，5秒后重试...");
+                    } else {
+                        info!("5秒后重试当前端点...");
+                    }
+                    
                     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                 }
             }
@@ -149,10 +170,14 @@ impl LiveEngine {
                 // 处理交易信号
                 match signal_event.signal {
                     Signal::Buy => {
-                        self.paper_trader.execute_paper_buy(signal_event.price, signal_event.timestamp);
+                        if let Err(e) = self.paper_trader.execute_paper_buy(signal_event.price, signal_event.timestamp).await {
+                            error!("执行买入失败: {}", e);
+                        }
                     }
                     Signal::Sell => {
-                        self.paper_trader.execute_paper_sell(signal_event.price, signal_event.timestamp);
+                        if let Err(e) = self.paper_trader.execute_paper_sell(signal_event.price, signal_event.timestamp).await {
+                            error!("执行卖出失败: {}", e);
+                        }
                     }
                     Signal::Hold => {
                         // 不执行任何操作
@@ -168,20 +193,13 @@ impl LiveEngine {
     }
 
     /// 定期打印账户状态
-    async fn print_periodic_status(&self) {
+    async fn print_periodic_status(&mut self) {
         info!("⏰ 定期状态报告:");
         
-        // 这里需要获取当前价格，简化处理（实际实现中可以维护最新价格）
-        // 由于这是定期报告，我们暂时使用0作为占位符
-        let current_price = 0.0; // 在实际实现中应该维护最新价格
-        
-        if current_price > 0.0 {
-            self.paper_trader.print_status(current_price);
-        } else {
-            info!("  交易次数: {}", self.paper_trader.trades().len());
-            info!("  现金: {:.2}", self.paper_trader.cash);
-            info!("  持仓: {:.6}", self.paper_trader.position);
-        }
+        // 简化状态报告，不需要当前价格参数
+        info!("  交易次数: {}", self.paper_trader.portfolio().get_trades().len());
+        info!("  现金: {:.2}", self.paper_trader.get_cash());
+        info!("  持仓: {:.6}", self.paper_trader.get_position());
     }
 
     /// 获取模拟交易者的引用
@@ -199,8 +217,9 @@ mod tests {
         let strategy = MACrossoverStrategy::new(10, 30);
         let engine = LiveEngine::new(strategy, 10000.0);
         
-        assert_eq!(engine.paper_trader.cash, 10000.0);
-        assert_eq!(engine.paper_trader.position, 0.0);
+        assert_eq!(engine.paper_trader.get_cash(), 10000.0);
+        assert_eq!(engine.paper_trader.get_position(), 0.0);
+        assert_eq!(engine.paper_trader.get_total_equity(100.0), 10000.0);
     }
 
     #[tokio::test]
@@ -264,6 +283,6 @@ mod tests {
         let result = engine.process_kline_message(test_message).await;
         assert!(result.is_ok());
         // 未完成的K线不应该触发任何交易
-        assert!(engine.paper_trader.trades().is_empty());
+        assert_eq!(engine.paper_trader.portfolio().get_trades().len(), 0);
     }
 }

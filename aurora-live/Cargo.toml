@@ -3,11 +3,16 @@ name = "aurora-live"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "aurora_live"
+path = "src/lib.rs"
+
 [dependencies]
 aurora-core = { path = "../aurora-core" }
 aurora-strategy = { path = "../aurora-strategy" }
+aurora-portfolio = { path = "../aurora-portfolio" }
 tokio = { version = "1.0", features = ["full"] }
-tokio-tungstenite = "0.21"
+tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 clap = { version = "4.4", features = ["derive"] }

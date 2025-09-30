@@ -130,6 +130,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aurora-core",
+ "aurora-portfolio",
  "aurora-strategy",
  "clap",
  "csv",
@@ -148,7 +149,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "serde",
+ "serde_json",
  "tokio",
+ "tokio-test",
 ]
 
 [[package]]
@@ -165,6 +168,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "tokio-tungstenite",
  "tracing",
@@ -185,6 +189,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aurora-core",
+ "aurora-portfolio",
  "aurora-strategy",
  "clap",
  "futures-util",
@@ -196,11 +201,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-portfolio"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "aurora-core",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "aurora-strategy"
 version = "0.1.0"
 dependencies = [
+ "approx",
  "aurora-core",
  "aurora-indicators",
+ "tokio",
 ]
 
 [[package]]
@@ -1594,7 +1614,9 @@ checksum = "c83b561d025642014097b66e6c1bb422783339e0909e4429cde4749d1990bc38"
 dependencies = [
  "futures-util",
  "log",
+ "native-tls",
  "tokio",
+ "tokio-native-tls",
  "tungstenite",
 ]
 
@@ -1696,6 +1718,7 @@ dependencies = [
  "http 1.3.1",
  "httparse",
  "log",
+ "native-tls",
  "rand",
  "sha1",
  "thiserror",

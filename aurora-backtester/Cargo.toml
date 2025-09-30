@@ -3,9 +3,14 @@ name = "aurora-backtester"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "aurora_backtester"
+path = "src/lib.rs"
+
 [dependencies]
 aurora-core = { path = "../aurora-core" }
 aurora-strategy = { path = "../aurora-strategy" }
+aurora-portfolio = { path = "../aurora-portfolio" }
 csv = "1.3"
 clap = { version = "4.4", features = ["derive"] }
 tracing = "0.1"
