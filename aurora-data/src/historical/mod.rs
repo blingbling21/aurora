@@ -39,16 +39,15 @@
 //! # }
 //! ```
 
-mod types;
-mod downloader;
-mod utils;
+pub mod downloader;
+pub mod types;
+pub mod utils;
 
-// 重新导出公共接口
 pub use downloader::BinanceHistoricalDownloader;
-pub use utils::{download_data, save_to_csv};
+pub use utils::download_data;
 
-// 内部类型仅在模块内可见
-pub(crate) use types::BinanceKline;
+#[cfg(test)]
+use utils::save_to_csv;
 
 #[cfg(test)]
 mod tests {

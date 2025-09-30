@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_csv_data_loader_creation() {
-        let loader = CsvDataLoader::new();
+        let _loader = CsvDataLoader::new();
         // 只是确保能创建实例
         assert!(true);
     }
