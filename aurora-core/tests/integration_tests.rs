@@ -1,8 +1,8 @@
 //! Aurora Core 核心模块集成测试
 
-use aurora_core::{Kline, MarketEvent, Signal, SignalEvent, Strategy, DataSource};
-use async_trait::async_trait;
 use anyhow::Result;
+use async_trait::async_trait;
+use aurora_core::{DataSource, Kline, MarketEvent, Signal, SignalEvent, Strategy};
 use tokio::sync::mpsc::{self, UnboundedReceiver};
 
 /// 模拟策略用于测试
@@ -18,7 +18,7 @@ impl MockStrategy {
             signal_index: 0,
         }
     }
-    
+
     fn with_signals(signals: Vec<SignalEvent>) -> Self {
         Self {
             signals,
@@ -54,12 +54,12 @@ impl MockDataSource {
 impl DataSource for MockDataSource {
     async fn start(&mut self) -> Result<UnboundedReceiver<MarketEvent>> {
         let (tx, rx) = mpsc::unbounded_channel();
-        
+
         // 发送所有K线数据
         for kline in self.klines.drain(..) {
             tx.send(MarketEvent::Kline(kline)).unwrap();
         }
-        
+
         Ok(rx)
     }
 }
@@ -121,7 +121,7 @@ fn test_kline_basic() {
         close: 102.0,
         volume: 1000.0,
     };
-    
+
     assert_eq!(kline.timestamp, 1640995200000);
     assert_eq!(kline.open, 100.0);
     assert_eq!(kline.high, 105.0);
@@ -141,12 +141,12 @@ fn test_kline_traits() {
         close: 102.0,
         volume: 1000.0,
     };
-    
+
     // 测试Clone
     let cloned_kline = kline.clone();
     assert_eq!(kline.timestamp, cloned_kline.timestamp);
     assert_eq!(kline.open, cloned_kline.open);
-    
+
     // 测试Debug
     let debug_string = format!("{:?}", kline);
     assert!(debug_string.contains("1640995200000"));
@@ -159,20 +159,20 @@ fn test_signal_basic() {
     let buy_signal = Signal::Buy;
     let sell_signal = Signal::Sell;
     let hold_signal = Signal::Hold;
-    
+
     // 测试匹配
     match buy_signal {
-        Signal::Buy => {},
+        Signal::Buy => {}
         _ => panic!("应该是买入信号"),
     }
-    
+
     match sell_signal {
-        Signal::Sell => {},
+        Signal::Sell => {}
         _ => panic!("应该是卖出信号"),
     }
-    
+
     match hold_signal {
-        Signal::Hold => {},
+        Signal::Hold => {}
         _ => panic!("应该是持有信号"),
     }
 }
@@ -185,7 +185,7 @@ fn test_signal_event() {
         price: 100.0,
         timestamp: 1640995200000,
     };
-    
+
     assert_eq!(signal_event.signal, Signal::Buy);
     assert_eq!(signal_event.price, 100.0);
     assert_eq!(signal_event.timestamp, 1640995200000);
@@ -202,9 +202,9 @@ fn test_market_event_basic() {
         close: 102.0,
         volume: 1000.0,
     };
-    
+
     let event = MarketEvent::Kline(kline.clone());
-    
+
     match event {
         MarketEvent::Kline(k) => {
             assert_eq!(k.timestamp, kline.timestamp);
@@ -224,9 +224,9 @@ fn test_market_event_traits() {
         close: 102.0,
         volume: 1000.0,
     };
-    
+
     let event = MarketEvent::Kline(kline);
-    
+
     // 测试Clone
     let cloned_event = event.clone();
     match (event, cloned_event) {
@@ -251,9 +251,9 @@ fn test_strategy_trait() {
             timestamp: 2000,
         },
     ];
-    
+
     let mut strategy = MockStrategy::with_signals(signals);
-    
+
     let kline = Kline {
         timestamp: 1640995200000,
         open: 100.0,
@@ -262,23 +262,23 @@ fn test_strategy_trait() {
         close: 102.0,
         volume: 1000.0,
     };
-    
+
     let event = MarketEvent::Kline(kline);
-    
+
     // 第一次调用应该返回买入信号
     let result1 = strategy.on_market_event(&event);
     assert!(result1.is_some());
     let signal1 = result1.unwrap();
     assert_eq!(signal1.signal, Signal::Buy);
     assert_eq!(signal1.price, 100.0);
-    
+
     // 第二次调用应该返回卖出信号
     let result2 = strategy.on_market_event(&event);
     assert!(result2.is_some());
     let signal2 = result2.unwrap();
     assert_eq!(signal2.signal, Signal::Sell);
     assert_eq!(signal2.price, 110.0);
-    
+
     // 第三次调用应该返回None
     let result3 = strategy.on_market_event(&event);
     assert!(result3.is_none());
@@ -290,19 +290,19 @@ async fn test_data_source_trait() -> Result<()> {
     let test_klines = create_test_klines();
     let expected_count = test_klines.len();
     let mut data_source = MockDataSource::new(test_klines);
-    
+
     // 启动数据源
     let mut event_receiver = data_source.start().await?;
-    
+
     let mut received_count = 0;
     while let Ok(event) = event_receiver.try_recv() {
         match event {
             MarketEvent::Kline(_) => received_count += 1,
         }
     }
-    
+
     assert_eq!(received_count, expected_count);
-    
+
     Ok(())
 }
 
@@ -327,31 +327,29 @@ async fn test_data_source_strategy_integration() -> Result<()> {
             volume: 800.0,
         },
     ];
-    
-    let signals = vec![
-        SignalEvent {
-            signal: Signal::Buy,
-            price: 105.0,
-            timestamp: 1000,
-        },
-    ];
-    
+
+    let signals = vec![SignalEvent {
+        signal: Signal::Buy,
+        price: 105.0,
+        timestamp: 1000,
+    }];
+
     let mut data_source = MockDataSource::new(test_klines);
     let mut strategy = MockStrategy::with_signals(signals);
-    
+
     // 启动数据源
     let mut event_receiver = data_source.start().await?;
-    
+
     let mut generated_signals = Vec::new();
     while let Ok(event) = event_receiver.try_recv() {
         if let Some(signal_event) = strategy.on_market_event(&event) {
             generated_signals.push(signal_event);
         }
     }
-    
+
     assert_eq!(generated_signals.len(), 1);
     assert_eq!(generated_signals[0].signal, Signal::Buy);
-    
+
     Ok(())
 }
 
@@ -366,12 +364,12 @@ fn test_kline_serialization() -> Result<()> {
         close: 102.0,
         volume: 1000.0,
     };
-    
+
     // 序列化
     let json_string = serde_json::to_string(&kline)?;
     assert!(json_string.contains("1640995200000"));
     assert!(json_string.contains("100.0"));
-    
+
     // 反序列化
     let deserialized_kline: Kline = serde_json::from_str(&json_string)?;
     assert_eq!(deserialized_kline.timestamp, kline.timestamp);
@@ -380,7 +378,7 @@ fn test_kline_serialization() -> Result<()> {
     assert_eq!(deserialized_kline.low, kline.low);
     assert_eq!(deserialized_kline.close, kline.close);
     assert_eq!(deserialized_kline.volume, kline.volume);
-    
+
     Ok(())
 }
 
@@ -396,10 +394,10 @@ fn test_boundary_values() {
         close: 0.0001,
         volume: 0.001,
     };
-    
+
     assert_eq!(small_kline.timestamp, 1);
     assert_eq!(small_kline.open, 0.0001);
-    
+
     // 测试零值
     let zero_kline = Kline {
         timestamp: 0,
@@ -409,7 +407,7 @@ fn test_boundary_values() {
         close: 0.0,
         volume: 0.0,
     };
-    
+
     assert_eq!(zero_kline.volume, 0.0);
 }
 
@@ -424,7 +422,7 @@ fn test_equality() {
         close: 102.0,
         volume: 1000.0,
     };
-    
+
     let kline2 = Kline {
         timestamp: 1640995200000,
         open: 100.0,
@@ -433,7 +431,7 @@ fn test_equality() {
         close: 102.0,
         volume: 1000.0,
     };
-    
+
     let kline3 = Kline {
         timestamp: 1640995200000,
         open: 100.0,
@@ -442,18 +440,18 @@ fn test_equality() {
         close: 103.0, // 不同的收盘价
         volume: 1000.0,
     };
-    
+
     // 测试相等的K线
     assert_eq!(kline1, kline2);
-    
+
     // 测试不相等的K线
     assert_ne!(kline1, kline3);
-    
+
     // 测试Signal的相等性
     let signal1 = Signal::Buy;
     let signal2 = Signal::Buy;
     let signal3 = Signal::Sell;
-    
+
     assert_eq!(signal1, signal2);
     assert_ne!(signal1, signal3);
 }
@@ -472,6 +470,6 @@ fn test_type_safety() {
     };
     let _signal: Signal = Signal::Buy;
     let _event: MarketEvent = MarketEvent::Kline(_kline);
-    
+
     // 这些应该能正常编译，证明类型定义正确
 }

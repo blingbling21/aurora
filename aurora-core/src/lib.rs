@@ -25,8 +25,8 @@
 //! let event = MarketEvent::Kline(kline);
 //! ```
 
-use serde::{Deserialize, Serialize};
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedReceiver;
 
 /// K线数据结构
@@ -292,7 +292,7 @@ mod tests {
             close: 102.0,
             volume: 1000.0,
         };
-        
+
         assert_eq!(kline.open, 100.0);
         assert_eq!(kline.close, 102.0);
         assert_eq!(kline.high, 105.0);
@@ -312,10 +312,10 @@ mod tests {
             close: 102.0,
             volume: 1000.0,
         };
-        
+
         let kline2 = kline1.clone();
         assert_eq!(kline1, kline2);
-        
+
         let kline3 = Kline {
             timestamp: 1640995200000,
             open: 100.0,
@@ -324,7 +324,7 @@ mod tests {
             close: 103.0, // 不同的收盘价
             volume: 1000.0,
         };
-        
+
         assert_ne!(kline1, kline3);
     }
 
@@ -334,7 +334,7 @@ mod tests {
         assert_eq!(Signal::Buy, Signal::Buy);
         assert_eq!(Signal::Sell, Signal::Sell);
         assert_eq!(Signal::Hold, Signal::Hold);
-        
+
         assert_ne!(Signal::Buy, Signal::Sell);
         assert_ne!(Signal::Buy, Signal::Hold);
         assert_ne!(Signal::Sell, Signal::Hold);
@@ -348,7 +348,7 @@ mod tests {
             price: 102.0,
             timestamp: 1640995200000,
         };
-        
+
         assert!(matches!(signal_event.signal, Signal::Buy));
         assert_eq!(signal_event.price, 102.0);
         assert_eq!(signal_event.timestamp, 1640995200000);
@@ -365,9 +365,9 @@ mod tests {
             close: 102.0,
             volume: 1000.0,
         };
-        
+
         let event = MarketEvent::Kline(kline.clone());
-        
+
         match event {
             MarketEvent::Kline(k) => {
                 assert_eq!(k, kline);
@@ -386,7 +386,7 @@ mod tests {
             close: 102.0,
             volume: 1000.0,
         };
-        
+
         // 验证价格逻辑关系
         assert!(kline.high >= kline.open);
         assert!(kline.high >= kline.close);
@@ -415,10 +415,10 @@ mod tests {
             close: 102.0,
             volume: 1000.0,
         };
-        
+
         let event1 = MarketEvent::Kline(kline);
         let event2 = event1.clone();
-        
+
         // 由于MarketEvent没有实现PartialEq，我们只能测试克隆是否成功
         match (&event1, &event2) {
             (MarketEvent::Kline(k1), MarketEvent::Kline(k2)) => {

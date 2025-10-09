@@ -35,10 +35,10 @@
 //! }
 //! ```
 
+mod analytics;
 mod portfolio;
 mod trade;
-mod analytics;
 
-pub use portfolio::{Portfolio, BasePortfolio};
-pub use trade::{Trade, TradeSide, TradeBuilder};
 pub use analytics::{EquityPoint, PerformanceMetrics, PortfolioAnalytics};
+pub use portfolio::{BasePortfolio, Portfolio};
+pub use trade::{Trade, TradeBuilder, TradeSide};

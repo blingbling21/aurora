@@ -1,13 +1,13 @@
 //! 模拟交易器模块
-//! 
+//!
 //! 为实时环境提供模拟交易功能，使用统一的投资组合管理接口
 
-use aurora_portfolio::{Portfolio, BasePortfolio};
-use tracing::{info, debug};
 use anyhow::Result;
+use aurora_portfolio::{BasePortfolio, Portfolio};
+use tracing::{debug, info};
 
 /// 模拟交易者
-/// 
+///
 /// 封装投资组合管理功能，为实时交易环境提供模拟交易能力
 #[derive(Debug)]
 pub struct PaperTrader {
@@ -18,7 +18,7 @@ impl PaperTrader {
     /// 创建新的模拟交易者
     pub fn new(initial_cash: f64) -> Self {
         info!("💰 初始化模拟账户，初始资金: {:.2}", initial_cash);
-        
+
         Self {
             portfolio: BasePortfolio::new(initial_cash),
         }
@@ -28,11 +28,16 @@ impl PaperTrader {
     pub async fn execute_paper_buy(&mut self, price: f64, timestamp: i64) -> Result<()> {
         match self.portfolio.execute_buy(price, timestamp).await {
             Ok(trade) => {
-                info!("📈 模拟买入成功: 价格={:.2}, 数量={:.6}, 总价值={:.2}", 
-                      trade.price, trade.quantity, trade.value);
-                
+                info!(
+                    "📈 模拟买入成功: 价格={:.2}, 数量={:.6}, 总价值={:.2}",
+                    trade.price, trade.quantity, trade.value
+                );
+
                 // 发送通知
-                self.send_notification(&format!("模拟买入 {:.6} @ {:.2}", trade.quantity, trade.price));
+                self.send_notification(&format!(
+                    "模拟买入 {:.6} @ {:.2}",
+                    trade.quantity, trade.price
+                ));
                 Ok(())
             }
             Err(e) => {
@@ -46,11 +51,16 @@ impl PaperTrader {
     pub async fn execute_paper_sell(&mut self, price: f64, timestamp: i64) -> Result<()> {
         match self.portfolio.execute_sell(price, timestamp).await {
             Ok(trade) => {
-                info!("📉 模拟卖出成功: 价格={:.2}, 数量={:.6}, 总价值={:.2}", 
-                      trade.price, trade.quantity, trade.value);
-                
+                info!(
+                    "📉 模拟卖出成功: 价格={:.2}, 数量={:.6}, 总价值={:.2}",
+                    trade.price, trade.quantity, trade.value
+                );
+
                 // 发送通知
-                self.send_notification(&format!("模拟卖出 {:.6} @ {:.2}", trade.quantity, trade.price));
+                self.send_notification(&format!(
+                    "模拟卖出 {:.6} @ {:.2}",
+                    trade.quantity, trade.price
+                ));
                 Ok(())
             }
             Err(e) => {
@@ -86,7 +96,7 @@ impl PaperTrader {
         let cash = self.get_cash();
         let position = self.get_position();
         let position_value = position * current_price;
-        
+
         info!("📊 账户状态:");
         info!("  现金: {:.2}", cash);
         info!("  持仓: {:.6} (价值: {:.2})", position, position_value);
@@ -119,7 +129,7 @@ mod tests {
     #[test]
     fn test_paper_trader_creation() {
         let trader = PaperTrader::new(10000.0);
-        
+
         // 验证初始状态
         assert_eq!(trader.get_cash(), 10000.0);
         assert_eq!(trader.get_position(), 0.0);
@@ -131,15 +141,15 @@ mod tests {
         let mut trader = PaperTrader::new(10000.0);
         let price = 50000.0;
         let timestamp = 1640995200000;
-        
+
         // 执行买入
         let result = trader.execute_paper_buy(price, timestamp).await;
         assert!(result.is_ok());
-        
+
         // 验证状态变化
         assert!(trader.get_position() > 0.0);
         assert!(trader.get_cash() < 10000.0);
-        
+
         // 验证权益计算
         let expected_equity = trader.get_cash() + trader.get_position() * price;
         assert!((trader.get_total_equity(price) - expected_equity).abs() < 0.01);
@@ -151,18 +161,20 @@ mod tests {
         let buy_price = 50000.0;
         let sell_price = 52000.0;
         let timestamp = 1640995200000;
-        
+
         // 先买入
         let _ = trader.execute_paper_buy(buy_price, timestamp).await;
         let position_after_buy = trader.get_position();
-        
+
         // 再卖出
-        let result = trader.execute_paper_sell(sell_price, timestamp + 60000).await;
+        let result = trader
+            .execute_paper_sell(sell_price, timestamp + 60000)
+            .await;
         assert!(result.is_ok());
-        
+
         // 验证状态变化
         assert_eq!(trader.get_position(), 0.0);
-        
+
         // 验证盈亏 (卖价高于买价，应该有盈利)
         let final_cash = trader.get_cash();
         let profit = final_cash - 10000.0;
@@ -174,10 +186,10 @@ mod tests {
         let mut trader = PaperTrader::new(10000.0);
         let price = 50000.0;
         let timestamp = 1640995200000;
-        
+
         // 在没有持仓的情况下尝试卖出
         let result = trader.execute_paper_sell(price, timestamp).await;
-        
+
         // 应该失败或没有效果
         if result.is_err() {
             // 如果返回错误，这是正确的行为
@@ -193,10 +205,10 @@ mod tests {
         let mut trader = PaperTrader::new(10000.0);
         let timestamp = 1640995200000;
         let price = 50000.0;
-        
+
         // 更新权益
         trader.update_equity(timestamp, price);
-        
+
         // 验证权益曲线有数据
         assert!(!trader.portfolio().get_equity_curve().is_empty());
     }
@@ -204,12 +216,12 @@ mod tests {
     #[test]
     fn test_status_methods() {
         let trader = PaperTrader::new(10000.0);
-        
+
         // 测试各种状态获取方法
         assert_eq!(trader.get_cash(), 10000.0);
         assert_eq!(trader.get_position(), 0.0);
         assert_eq!(trader.get_total_equity(50000.0), 10000.0);
-        
+
         // 测试投资组合引用
         let portfolio_ref = trader.portfolio();
         assert_eq!(portfolio_ref.get_cash(), 10000.0);
@@ -218,7 +230,7 @@ mod tests {
     #[test]
     fn test_send_notification() {
         let trader = PaperTrader::new(10000.0);
-        
+
         // 测试通知发送 (内部私有方法，通过其他方法间接测试)
         // 这里主要验证不会panic
         trader.send_notification("测试通知");
@@ -228,7 +240,7 @@ mod tests {
     fn test_print_status() {
         let trader = PaperTrader::new(10000.0);
         let price = 50000.0;
-        
+
         // 测试状态打印 (主要验证不会panic)
         trader.print_status(price);
     }
@@ -237,7 +249,7 @@ mod tests {
     fn test_print_performance_report() {
         let trader = PaperTrader::new(10000.0);
         let time_period_days = 30.0;
-        
+
         // 测试业绩报告打印 (主要验证不会panic)
         trader.print_performance_report(time_period_days);
     }
@@ -245,19 +257,19 @@ mod tests {
     #[tokio::test]
     async fn test_multiple_trades_scenario() {
         let mut trader = PaperTrader::new(10000.0);
-        
+
         // 执行多次交易
         let _ = trader.execute_paper_buy(50000.0, 1640995200000).await;
         let _ = trader.execute_paper_sell(52000.0, 1640995300000).await;
         let _ = trader.execute_paper_buy(51000.0, 1640995400000).await;
-        
+
         // 验证交易历史
         assert!(!trader.portfolio().get_trades().is_empty());
-        
+
         // 验证状态一致性
         assert!(trader.get_position() > 0.0); // 应该有持仓
         assert!(trader.get_cash() >= 0.0); // 现金余额应该非负（可能为0）
-        
+
         // 验证总权益保持合理
         let total_equity = trader.get_total_equity(51000.0);
         assert!(total_equity > 0.0);

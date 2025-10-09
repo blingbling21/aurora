@@ -1,17 +1,17 @@
 //! # 历史数据类型定义
-//! 
+//!
 //! 定义了与历史数据获取相关的数据类型和转换实现。
 
 use aurora_core::Kline;
 use serde::{Deserialize, Serialize};
 
 /// Binance API返回的原始K线数据格式
-/// 
+///
 /// 这个结构体对应Binance API返回的数组格式数据。
 /// 每个字段都是字符串格式，需要转换为相应的数值类型。
-/// 
+///
 /// ## 字段说明
-/// 
+///
 /// 0. 开盘时间 (timestamp)
 /// 1. 开盘价 (string)  
 /// 2. 最高价 (string)
@@ -24,49 +24,49 @@ use serde::{Deserialize, Serialize};
 /// 9. 主动买入成交量 (string)
 /// 10. 主动买入成交额 (string)
 /// 11. 忽略字段
-/// 
+///
 /// ## 注意事项
-/// 
+///
 /// Binance返回的所有价格和数量字段都是字符串格式，
 /// 这是为了保持精度，避免浮点数精度问题。
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub(crate) struct BinanceKline(
     /// 开盘时间（毫秒时间戳）
-    pub i64,    
+    pub i64,
     /// 开盘价（字符串格式，保持精度）
-    pub String, 
+    pub String,
     /// 最高价（字符串格式，保持精度）
-    pub String, 
+    pub String,
     /// 最低价（字符串格式，保持精度）
-    pub String, 
+    pub String,
     /// 收盘价（字符串格式，保持精度）
-    pub String, 
+    pub String,
     /// 成交量（字符串格式，保持精度）
-    pub String, 
+    pub String,
     /// 收盘时间（毫秒时间戳）
-    pub i64,    
+    pub i64,
     /// 成交额（字符串格式）
-    pub String, 
+    pub String,
     /// 成交笔数
-    pub i64,    
+    pub i64,
     /// 主动买入成交量（字符串格式）
-    pub String, 
+    pub String,
     /// 主动买入成交额（字符串格式）
-    pub String, 
+    pub String,
     /// 忽略字段（通常为"0"）
-    pub String, 
+    pub String,
 );
 
 impl From<BinanceKline> for Kline {
     /// 将Binance原始数据转换为标准Kline格式
-    /// 
+    ///
     /// 这个转换过程包括：
     /// 1. 字符串价格转换为f64浮点数
     /// 2. 提取必要的字段
     /// 3. 处理解析错误（使用默认值0.0）
-    /// 
+    ///
     /// # 错误处理
-    /// 
+    ///
     /// 如果字符串解析失败，将使用0.0作为默认值。
     /// 在生产环境中，应该考虑更严格的错误处理。
     fn from(binance_kline: BinanceKline) -> Self {

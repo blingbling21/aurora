@@ -1,6 +1,8 @@
 //! 集成测试 - 测试整个投资组合管理流程
 
-use aurora_portfolio::{Portfolio, BasePortfolio, Trade, TradeSide, PerformanceMetrics, PortfolioAnalytics};
+use aurora_portfolio::{
+    BasePortfolio, PerformanceMetrics, Portfolio, PortfolioAnalytics, Trade, TradeSide,
+};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// 测试完整的交易流程
@@ -36,7 +38,10 @@ async fn test_complete_trading_flow() {
     assert_eq!(portfolio.get_total_equity(110.0), 11000.0);
 
     // 执行卖出
-    let sell_trade = portfolio.execute_sell(110.0, timestamp + 120000).await.unwrap();
+    let sell_trade = portfolio
+        .execute_sell(110.0, timestamp + 120000)
+        .await
+        .unwrap();
     assert_eq!(sell_trade.side, TradeSide::Sell);
     assert_eq!(sell_trade.price, 110.0);
     assert_eq!(sell_trade.quantity, 100.0);
@@ -91,15 +96,24 @@ async fn test_performance_calculation() {
     // 执行一系列交易
     portfolio.execute_buy(100.0, start_time).await.unwrap();
     portfolio.update_equity(start_time + 3600000, 105.0); // 1小时后
-    portfolio.execute_sell(105.0, start_time + 7200000).await.unwrap(); // 2小时后
+    portfolio
+        .execute_sell(105.0, start_time + 7200000)
+        .await
+        .unwrap(); // 2小时后
 
-    portfolio.execute_buy(105.0, start_time + 10800000).await.unwrap(); // 3小时后
+    portfolio
+        .execute_buy(105.0, start_time + 10800000)
+        .await
+        .unwrap(); // 3小时后
     portfolio.update_equity(start_time + 14400000, 110.0); // 4小时后
-    portfolio.execute_sell(110.0, start_time + 18000000).await.unwrap(); // 5小时后
+    portfolio
+        .execute_sell(110.0, start_time + 18000000)
+        .await
+        .unwrap(); // 5小时后
 
     // 计算业绩
     let metrics = portfolio.calculate_performance(1.0); // 1天
-    
+
     assert!(metrics.total_return > 0.0);
     assert_eq!(metrics.total_trades, 2);
     assert_eq!(metrics.winning_trades, 2);
@@ -118,7 +132,7 @@ async fn test_drawdown_calculation() {
 
     // 模拟价格波动
     portfolio.update_equity(timestamp + 1000, 110.0); // 上涨10%
-    portfolio.update_equity(timestamp + 2000, 95.0);  // 下跌到95，产生回撤
+    portfolio.update_equity(timestamp + 2000, 95.0); // 下跌到95，产生回撤
     portfolio.update_equity(timestamp + 3000, 120.0); // 恢复并创新高
 
     let equity_curve = portfolio.get_equity_curve();
@@ -131,7 +145,8 @@ async fn test_drawdown_calculation() {
         equity_curve,
         portfolio.get_trades(),
         1.0,
-    ).max_drawdown;
+    )
+    .max_drawdown;
 
     assert!(max_drawdown > 0.0); // 应该有回撤
 }
@@ -203,32 +218,36 @@ async fn test_high_frequency_trading_performance() {
     // 执行大量买卖操作
     for i in 0..100 {
         let price = 100.0 + (i as f64);
-        
+
         if i % 2 == 0 {
             // 买入
             if portfolio.get_cash() > price {
-                let _ = portfolio.execute_buy(price, timestamp + (i as i64) * 1000).await;
+                let _ = portfolio
+                    .execute_buy(price, timestamp + (i as i64) * 1000)
+                    .await;
             }
         } else {
             // 卖出
             if portfolio.get_position() > 0.0 {
-                let _ = portfolio.execute_sell(price, timestamp + (i as i64) * 1000).await;
+                let _ = portfolio
+                    .execute_sell(price, timestamp + (i as i64) * 1000)
+                    .await;
             }
         }
-        
+
         // 更新权益
         portfolio.update_equity(timestamp + (i as i64) * 1000, price);
     }
 
     let duration = start_time.elapsed();
     println!("100次交易操作耗时: {:?}", duration);
-    
+
     // 验证性能要求（100次操作应该在1秒内完成）
     assert!(duration.as_secs() < 1);
-    
+
     // 验证交易记录
     assert!(portfolio.get_trades().len() > 0);
-    
+
     // 验证权益曲线
     assert_eq!(portfolio.get_equity_curve().len(), 100);
 }

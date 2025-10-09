@@ -1,11 +1,11 @@
 //! 投资组合管理核心模块
 
-use async_trait::async_trait;
 use anyhow::Result;
-use tracing::{info, debug, warn};
+use async_trait::async_trait;
+use tracing::{debug, info, warn};
 
-use crate::trade::Trade;
 use crate::analytics::{EquityPoint, PerformanceMetrics, PortfolioAnalytics};
+use crate::trade::Trade;
 
 /// 投资组合管理统一接口
 ///
@@ -300,7 +300,7 @@ mod tests {
     #[tokio::test]
     async fn test_portfolio_creation() {
         let portfolio = BasePortfolio::new(10000.0);
-        
+
         assert_eq!(portfolio.get_cash(), 10000.0);
         assert_eq!(portfolio.get_position(), 0.0);
         assert_eq!(portfolio.get_total_equity(100.0), 10000.0);
@@ -310,9 +310,9 @@ mod tests {
     #[tokio::test]
     async fn test_buy_operation() {
         let mut portfolio = BasePortfolio::new(10000.0);
-        
+
         let trade = portfolio.execute_buy(100.0, 1640995200000).await.unwrap();
-        
+
         assert_eq!(trade.side, TradeSide::Buy);
         assert_eq!(trade.price, 100.0);
         assert_eq!(trade.quantity, 100.0); // 10000 / 100
@@ -324,13 +324,13 @@ mod tests {
     #[tokio::test]
     async fn test_sell_operation() {
         let mut portfolio = BasePortfolio::new(10000.0);
-        
+
         // 先买入
         portfolio.execute_buy(100.0, 1640995200000).await.unwrap();
-        
+
         // 再卖出
         let trade = portfolio.execute_sell(105.0, 1640995260000).await.unwrap();
-        
+
         assert_eq!(trade.side, TradeSide::Sell);
         assert_eq!(trade.price, 105.0);
         assert_eq!(trade.quantity, 100.0);
@@ -342,10 +342,10 @@ mod tests {
     #[tokio::test]
     async fn test_equity_update() {
         let mut portfolio = BasePortfolio::new(10000.0);
-        
+
         portfolio.execute_buy(100.0, 1640995200000).await.unwrap();
         portfolio.update_equity(1640995260000, 105.0);
-        
+
         let equity_curve = portfolio.get_equity_curve();
         assert_eq!(equity_curve.len(), 1);
         assert_eq!(equity_curve[0].equity, 10500.0); // 100 * 105
@@ -355,15 +355,15 @@ mod tests {
     #[tokio::test]
     async fn test_invalid_operations() {
         let mut portfolio = BasePortfolio::new(10000.0);
-        
+
         // 测试无持仓时卖出
         let result = portfolio.execute_sell(100.0, 1640995200000).await;
         assert!(result.is_err());
-        
+
         // 测试无效价格
         let result = portfolio.execute_buy(-100.0, 1640995200000).await;
         assert!(result.is_err());
-        
+
         // 测试无效时间戳
         let result = portfolio.execute_buy(100.0, -1).await;
         assert!(result.is_err());

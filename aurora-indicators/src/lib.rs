@@ -85,26 +85,26 @@ pub struct MA {
 
 impl MA {
     /// 创建新的移动平均线指标
-    /// 
+    ///
     /// # 参数
-    /// 
+    ///
     /// * `period` - 移动平均的周期，必须大于0
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// 如果周期为0，函数会panic
-    /// 
+    ///
     /// # 示例
-    /// 
+    ///
     /// ```rust
     /// use aurora_indicators::MA;
-    /// 
+    ///
     /// let ma5 = MA::new(5);   // 5周期移动平均线
     /// let ma20 = MA::new(20); // 20周期移动平均线
     /// ```
     pub fn new(period: usize) -> Self {
         assert!(period > 0, "移动平均周期必须大于0");
-        
+
         Self {
             period,
             values: VecDeque::with_capacity(period),
@@ -113,26 +113,26 @@ impl MA {
     }
 
     /// 更新指标并返回最新的移动平均值
-    /// 
+    ///
     /// # 参数
-    /// 
+    ///
     /// * `price` - 新的价格数据
-    /// 
+    ///
     /// # 返回值
-    /// 
+    ///
     /// * `Some(f64)` - 如果已有足够的数据点（>= period），返回移动平均值
     /// * `None` - 如果数据点不足，返回None
-    /// 
+    ///
     /// # 示例
-    /// 
+    ///
     /// ```rust
     /// use aurora_indicators::MA;
-    /// 
+    ///
     /// let mut ma = MA::new(3);
-    /// 
+    ///
     /// assert_eq!(ma.update(10.0), None);  // 数据不足
     /// assert_eq!(ma.update(20.0), None);  // 数据不足
-    /// 
+    ///
     /// let avg = ma.update(30.0).unwrap(); // 有足够数据了
     /// assert_eq!(avg, 20.0); // (10+20+30)/3 = 20
     /// ```
@@ -157,25 +157,25 @@ impl MA {
     }
 
     /// 获取当前的移动平均值（如果可用）
-    /// 
+    ///
     /// # 返回值
-    /// 
+    ///
     /// * `Some(f64)` - 如果已有足够的数据点，返回当前移动平均值
     /// * `None` - 如果数据点不足，返回None
-    /// 
+    ///
     /// # 示例
-    /// 
+    ///
     /// ```rust
     /// use aurora_indicators::MA;
-    /// 
+    ///
     /// let mut ma = MA::new(3);
-    /// 
+    ///
     /// assert_eq!(ma.value(), None); // 还没有数据
-    /// 
+    ///
     /// ma.update(10.0);
     /// ma.update(20.0);
     /// assert_eq!(ma.value(), None); // 数据仍然不足
-    /// 
+    ///
     /// ma.update(30.0);
     /// assert_eq!(ma.value(), Some(20.0)); // 现在有值了
     /// ```
@@ -188,21 +188,21 @@ impl MA {
     }
 
     /// 重置指标状态
-    /// 
+    ///
     /// 清空所有历史数据，将指标恢复到初始状态。
-    /// 
+    ///
     /// # 示例
-    /// 
+    ///
     /// ```rust
     /// use aurora_indicators::MA;
-    /// 
+    ///
     /// let mut ma = MA::new(3);
-    /// 
+    ///
     /// ma.update(10.0);
     /// ma.update(20.0);
     /// ma.update(30.0);
     /// assert_eq!(ma.value(), Some(20.0));
-    /// 
+    ///
     /// ma.reset();
     /// assert_eq!(ma.value(), None); // 重置后没有值
     /// ```
@@ -212,16 +212,16 @@ impl MA {
     }
 
     /// 获取当前的周期设置
-    /// 
+    ///
     /// # 返回值
-    /// 
+    ///
     /// 返回创建指标时设置的周期长度
-    /// 
+    ///
     /// # 示例
-    /// 
+    ///
     /// ```rust
     /// use aurora_indicators::MA;
-    /// 
+    ///
     /// let ma = MA::new(10);
     /// assert_eq!(ma.period(), 10);
     /// ```
@@ -230,23 +230,23 @@ impl MA {
     }
 
     /// 获取当前已接收的数据点数量
-    /// 
+    ///
     /// # 返回值
-    /// 
+    ///
     /// 返回当前存储在滑动窗口中的数据点数量
-    /// 
+    ///
     /// # 示例
-    /// 
+    ///
     /// ```rust
     /// use aurora_indicators::MA;
-    /// 
+    ///
     /// let mut ma = MA::new(5);
-    /// 
+    ///
     /// assert_eq!(ma.len(), 0);
-    /// 
+    ///
     /// ma.update(100.0);
     /// assert_eq!(ma.len(), 1);
-    /// 
+    ///
     /// ma.update(102.0);
     /// assert_eq!(ma.len(), 2);
     /// ```
@@ -255,20 +255,20 @@ impl MA {
     }
 
     /// 检查指标是否为空（没有数据）
-    /// 
+    ///
     /// # 返回值
-    /// 
+    ///
     /// 如果指标中没有任何数据，返回true；否则返回false
-    /// 
+    ///
     /// # 示例
-    /// 
+    ///
     /// ```rust
     /// use aurora_indicators::MA;
-    /// 
+    ///
     /// let mut ma = MA::new(3);
-    /// 
+    ///
     /// assert!(ma.is_empty());
-    /// 
+    ///
     /// ma.update(100.0);
     /// assert!(!ma.is_empty());
     /// ```
@@ -277,24 +277,24 @@ impl MA {
     }
 
     /// 检查指标是否已准备好（有足够的数据）
-    /// 
+    ///
     /// # 返回值
-    /// 
+    ///
     /// 如果指标已有足够的数据点来计算移动平均值，返回true
-    /// 
+    ///
     /// # 示例
-    /// 
+    ///
     /// ```rust
     /// use aurora_indicators::MA;
-    /// 
+    ///
     /// let mut ma = MA::new(3);
-    /// 
+    ///
     /// assert!(!ma.is_ready());
-    /// 
+    ///
     /// ma.update(10.0);
     /// ma.update(20.0);
     /// assert!(!ma.is_ready()); // 还需要一个数据点
-    /// 
+    ///
     /// ma.update(30.0);
     /// assert!(ma.is_ready()); // 现在准备好了
     /// ```
@@ -330,16 +330,16 @@ mod tests {
     #[test]
     fn test_ma_insufficient_data() {
         let mut ma = MA::new(3);
-        
+
         assert_eq!(ma.update(10.0), None);
         assert_eq!(ma.len(), 1);
         assert!(!ma.is_empty());
         assert!(!ma.is_ready());
-        
+
         assert_eq!(ma.update(20.0), None);
         assert_eq!(ma.len(), 2);
         assert!(!ma.is_ready());
-        
+
         assert_eq!(ma.value(), None);
     }
 
@@ -347,11 +347,11 @@ mod tests {
     #[test]
     fn test_ma_sufficient_data() {
         let mut ma = MA::new(3);
-        
+
         ma.update(10.0);
         ma.update(20.0);
         let result = ma.update(30.0);
-        
+
         assert!(result.is_some());
         assert_relative_eq!(result.unwrap(), 20.0, epsilon = 1e-10);
         assert_relative_eq!(ma.value().unwrap(), 20.0, epsilon = 1e-10);
@@ -363,20 +363,20 @@ mod tests {
     #[test]
     fn test_ma_sliding_window() {
         let mut ma = MA::new(3);
-        
+
         // 填充初始数据
         ma.update(10.0);
         ma.update(20.0);
         let result1 = ma.update(30.0);
         assert_relative_eq!(result1.unwrap(), 20.0, epsilon = 1e-10); // (10+20+30)/3 = 20
-        
+
         // 添加新数据，应该滑动窗口
         let result2 = ma.update(40.0);
         assert_relative_eq!(result2.unwrap(), 30.0, epsilon = 1e-10); // (20+30+40)/3 = 30
-        
+
         let result3 = ma.update(50.0);
         assert_relative_eq!(result3.unwrap(), 40.0, epsilon = 1e-10); // (30+40+50)/3 = 40
-        
+
         // 验证窗口大小始终保持为3
         assert_eq!(ma.len(), 3);
     }
@@ -385,17 +385,17 @@ mod tests {
     #[test]
     fn test_ma_reset() {
         let mut ma = MA::new(3);
-        
+
         ma.update(10.0);
         ma.update(20.0);
         ma.update(30.0);
-        
+
         assert!(ma.value().is_some());
         assert!(ma.is_ready());
         assert!(!ma.is_empty());
-        
+
         ma.reset();
-        
+
         assert_eq!(ma.len(), 0);
         assert_eq!(ma.sum, 0.0);
         assert!(ma.value().is_none());
@@ -407,13 +407,13 @@ mod tests {
     #[test]
     fn test_ma_single_period() {
         let mut ma = MA::new(1);
-        
+
         let result1 = ma.update(42.0);
         assert_relative_eq!(result1.unwrap(), 42.0, epsilon = 1e-10);
-        
+
         let result2 = ma.update(84.0);
         assert_relative_eq!(result2.unwrap(), 84.0, epsilon = 1e-10);
-        
+
         assert_eq!(ma.len(), 1); // 单周期只保存一个值
     }
 
@@ -421,21 +421,21 @@ mod tests {
     #[test]
     fn test_ma_large_dataset() {
         let mut ma = MA::new(100);
-        
+
         // 添加前99个数据点，不应该有返回值
         for i in 1..100 {
             assert_eq!(ma.update(i as f64), None);
         }
-        
+
         assert_eq!(ma.len(), 99);
         assert!(!ma.is_ready());
-        
+
         // 第100个数据点应该产生结果
         let result = ma.update(100.0);
         assert!(result.is_some());
         assert!(ma.is_ready());
         assert_eq!(ma.len(), 100);
-        
+
         // 验证计算结果: (1+2+...+100)/100 = 50.5
         assert_relative_eq!(result.unwrap(), 50.5, epsilon = 1e-10);
     }
@@ -444,20 +444,20 @@ mod tests {
     #[test]
     fn test_ma_extreme_values() {
         let mut ma = MA::new(3);
-        
+
         // 测试0值
         ma.update(0.0);
         ma.update(0.0);
         let result1 = ma.update(0.0);
         assert_relative_eq!(result1.unwrap(), 0.0, epsilon = 1e-10);
-        
+
         // 测试负值
         ma.reset();
         ma.update(-10.0);
         ma.update(-20.0);
         let result2 = ma.update(-30.0);
         assert_relative_eq!(result2.unwrap(), -20.0, epsilon = 1e-10);
-        
+
         // 测试很大的值
         ma.reset();
         ma.update(1e10);
@@ -470,13 +470,13 @@ mod tests {
     #[test]
     fn test_ma_precision() {
         let mut ma = MA::new(3);
-        
+
         // 使用需要高精度的小数
-        ma.update(1.0/3.0);  // 0.333...
-        ma.update(2.0/3.0);  // 0.666...
+        ma.update(1.0 / 3.0); // 0.333...
+        ma.update(2.0 / 3.0); // 0.666...
         let result = ma.update(1.0);
-        
-        let expected = (1.0/3.0 + 2.0/3.0 + 1.0) / 3.0; // 2/3
+
+        let expected = (1.0 / 3.0 + 2.0 / 3.0 + 1.0) / 3.0; // 2/3
         assert_relative_eq!(result.unwrap(), expected, epsilon = 1e-15);
     }
 
@@ -486,9 +486,9 @@ mod tests {
         let mut ma1 = MA::new(3);
         ma1.update(10.0);
         ma1.update(20.0);
-        
+
         let ma2 = ma1.clone();
-        
+
         // 克隆的对象应该有相同的状态
         assert_eq!(ma1.period(), ma2.period());
         assert_eq!(ma1.len(), ma2.len());
@@ -501,7 +501,7 @@ mod tests {
     fn test_ma_debug_format() {
         let mut ma = MA::new(5);
         ma.update(100.0);
-        
+
         let debug_str = format!("{:?}", ma);
         assert!(debug_str.contains("MA"));
         assert!(debug_str.contains("period: 5"));
@@ -511,12 +511,12 @@ mod tests {
     #[test]
     fn test_ma_overflow_resistance() {
         let mut ma = MA::new(2);
-        
+
         // 使用接近f64最大值的数字
         let large_val = f64::MAX / 10.0;
         ma.update(large_val);
         let result = ma.update(large_val);
-        
+
         assert!(result.is_some());
         assert_relative_eq!(result.unwrap(), large_val, epsilon = large_val * 1e-15);
     }

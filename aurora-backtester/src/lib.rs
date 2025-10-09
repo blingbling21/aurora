@@ -40,7 +40,7 @@ mod tests {
                 let _ = run_backtest("nonexistent.csv", "ma-crossover", 5, 10, 10000.0).await;
             });
         });
-        
+
         // 不管成功还是失败，只要不是编译错误就说明函数存在且签名正确
         let _ = result;
     }

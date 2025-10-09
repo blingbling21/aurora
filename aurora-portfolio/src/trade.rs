@@ -154,7 +154,7 @@ mod tests {
     #[test]
     fn test_trade_creation() {
         let trade = Trade::new_buy(100.0, 10.0, 1640995200000);
-        
+
         assert_eq!(trade.side, TradeSide::Buy);
         assert_eq!(trade.price, 100.0);
         assert_eq!(trade.quantity, 10.0);
@@ -170,7 +170,7 @@ mod tests {
             .with_fee(2.5)
             .with_note("止盈卖出".to_string())
             .build();
-        
+
         assert_eq!(trade.side, TradeSide::Sell);
         assert_eq!(trade.fee, Some(2.5));
         assert_eq!(trade.note, Some("止盈卖出".to_string()));

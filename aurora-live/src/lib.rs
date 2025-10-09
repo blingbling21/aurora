@@ -28,7 +28,7 @@ mod tests {
         // 验证基本方法可以调用
         assert!(trader.get_cash() > 0.0);
         assert_eq!(trader.get_position(), 0.0);
-        
+
         // 验证引擎方法存在（不实际调用run，因为需要网络连接）
         let _paper_trader_ref = engine.paper_trader();
     }

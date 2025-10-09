@@ -1,9 +1,9 @@
-use aurora_core::{Kline, MarketEvent, Signal, Strategy};
-use aurora_strategy::MACrossoverStrategy;
-use aurora_portfolio::{Portfolio, BasePortfolio};
 use anyhow::{Result, anyhow};
+use aurora_core::{Kline, MarketEvent, Signal, Strategy};
+use aurora_portfolio::{BasePortfolio, Portfolio};
+use aurora_strategy::MACrossoverStrategy;
 use std::path::Path;
-use tracing::{info, debug, error};
+use tracing::{debug, error, info};
 
 /// 运行回测
 pub async fn run_backtest(
@@ -32,8 +32,10 @@ pub async fn run_backtest(
         _ => return Err(anyhow!("不支持的策略: {}", strategy_name)),
     };
 
-    info!("初始化回测引擎，策略: {}, 参数: {}:{}, 初始资金: {:.2}", 
-          strategy_name, short_period, long_period, initial_cash);
+    info!(
+        "初始化回测引擎，策略: {}, 参数: {}:{}, 初始资金: {:.2}",
+        strategy_name, short_period, long_period, initial_cash
+    );
 
     // 创建回测引擎并运行
     let mut engine = BacktestEngine::new(strategy, initial_cash);
@@ -80,9 +82,11 @@ impl BacktestEngine {
 
     /// 运行回测
     pub async fn run(&mut self, klines: &[Kline]) -> Result<()> {
-        info!("开始回测，数据时间范围: {} - {}", 
-              klines.first().map(|k| k.timestamp).unwrap_or(0),
-              klines.last().map(|k| k.timestamp).unwrap_or(0));
+        info!(
+            "开始回测，数据时间范围: {} - {}",
+            klines.first().map(|k| k.timestamp).unwrap_or(0),
+            klines.last().map(|k| k.timestamp).unwrap_or(0)
+        );
 
         let mut processed_count = 0;
         let total_count = klines.len();
@@ -93,17 +97,28 @@ impl BacktestEngine {
 
             // 让策略处理事件
             if let Some(signal_event) = self.strategy.on_market_event(&market_event) {
-                debug!("收到交易信号: {:?} at price {:.2}", signal_event.signal, signal_event.price);
+                debug!(
+                    "收到交易信号: {:?} at price {:.2}",
+                    signal_event.signal, signal_event.price
+                );
 
                 // 执行交易信号
                 match signal_event.signal {
                     Signal::Buy => {
-                        if let Err(e) = self.portfolio.execute_buy(signal_event.price, signal_event.timestamp).await {
+                        if let Err(e) = self
+                            .portfolio
+                            .execute_buy(signal_event.price, signal_event.timestamp)
+                            .await
+                        {
                             debug!("买入失败: {}", e);
                         }
                     }
                     Signal::Sell => {
-                        if let Err(e) = self.portfolio.execute_sell(signal_event.price, signal_event.timestamp).await {
+                        if let Err(e) = self
+                            .portfolio
+                            .execute_sell(signal_event.price, signal_event.timestamp)
+                            .await
+                        {
                             debug!("卖出失败: {}", e);
                         }
                     }
@@ -117,17 +132,20 @@ impl BacktestEngine {
             self.portfolio.update_equity(kline.timestamp, kline.close);
 
             processed_count += 1;
-            
+
             // 每处理10%的数据输出一次进度
             if processed_count % (total_count / 10).max(1) == 0 {
                 let progress = (processed_count as f64 / total_count as f64) * 100.0;
                 let current_equity = self.portfolio.get_total_equity(kline.close);
-                info!("回测进度: {:.1}%, 当前权益: {:.2}", progress, current_equity);
+                info!(
+                    "回测进度: {:.1}%, 当前权益: {:.2}",
+                    progress, current_equity
+                );
             }
         }
 
         info!("回测完成，处理了 {} 条K线数据", processed_count);
-        
+
         // 计算并打印回测报告
         let time_period_days = if !klines.is_empty() {
             let start_time = klines.first().unwrap().timestamp;
@@ -136,7 +154,7 @@ impl BacktestEngine {
         } else {
             1.0
         };
-        
+
         let metrics = self.portfolio.calculate_performance(time_period_days);
         metrics.print_report();
 
@@ -154,7 +172,7 @@ mod tests {
     use super::*;
     use std::fs::File;
     use std::io::Write;
-    use tempfile::{tempdir, TempDir};
+    use tempfile::{TempDir, tempdir};
 
     fn create_test_csv() -> Result<(String, TempDir)> {
         let dir = tempdir()?;
@@ -175,12 +193,12 @@ mod tests {
     fn test_load_klines_from_csv() {
         let (csv_path, _temp_dir) = create_test_csv().unwrap();
         let klines = load_klines_from_csv(&csv_path).unwrap();
-        
+
         assert_eq!(klines.len(), 5);
         assert_eq!(klines[0].timestamp, 1640995200000);
         assert_eq!(klines[0].close, 50500.0);
         assert_eq!(klines[4].close, 52500.0);
-        
+
         // _temp_dir 在这里自动清理
     }
 
@@ -188,17 +206,17 @@ mod tests {
     async fn test_backtest_engine() {
         let (csv_path, _temp_dir) = create_test_csv().unwrap();
         let klines = load_klines_from_csv(&csv_path).unwrap();
-        
+
         let strategy = MACrossoverStrategy::new(2, 3);
         let mut engine = BacktestEngine::new(strategy, 10000.0);
-        
+
         let result = engine.run(&klines).await;
         assert!(result.is_ok());
-        
+
         // 验证投资组合状态
         let portfolio = engine.portfolio();
         assert!(!portfolio.get_equity_curve().is_empty());
-        
+
         // _temp_dir 在这里自动清理
     }
 
