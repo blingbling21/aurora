@@ -19,23 +19,28 @@
 //! # 支持的指标
 //!
 //! ## 趋势指标
-//! - **MA (移动平均线)**: 简单移动平均线，用于识别趋势方向
+//! - **MA (移动平均线)**: 简单移动平均线,用于识别趋势方向
 //! - **EMA (指数移动平均线)**: 对近期数据赋予更高权重的移动平均线
 //! - **MACD (移动平均收敛散度)**: 用于判断趋势变化和买卖时机
+//! - **ADX (平均动向指数)**: 衡量趋势强度但不判断方向
 //!
 //! ## 动量指标
 //! - **RSI (相对强弱指数)**: 衡量价格变动速度和幅度
 //! - **Stochastic (随机震荡指标)**: 比较收盘价与价格区间的位置
+//! - **ROC (变动率指标)**: 衡量当前价格相对于N周期前的变化百分比
+//! - **CCI (商品通道指数)**: 衡量价格相对于统计平均值的偏离程度
+//! - **Williams %R (威廉指标)**: 衡量收盘价在N周期高低区间中的相对位置
 //!
 //! ## 波动率指标
 //! - **Bollinger Bands (布林带)**: 基于标准差的价格通道
 //! - **ATR (平均真实波幅)**: 衡量市场波动程度
+//! - **StdDev (标准差)**: 衡量价格相对于平均值的离散程度
+//! - **Keltner Channels (肯特纳通道)**: 基于ATR的价格通道
 //!
 //! ## 成交量指标
 //! - **OBV (能量潮)**: 通过成交量变化预测价格趋势
-//!
-//! ## 趋势强度指标
-//! - **ADX (平均动向指数)**: 衡量趋势强度但不判断方向
+//! - **MFI (资金流量指数)**: 成交量加权的RSI
+//! - **VWAP (成交量加权平均价)**: 计算成交量加权的平均价格
 //!
 //! # 设计原则
 //!
@@ -71,6 +76,13 @@ mod atr;
 mod stochastic;
 mod obv;
 mod adx;
+mod roc;
+mod cci;
+mod williams_r;
+mod stddev;
+mod keltner;
+mod mfi;
+mod vwap;
 
 // 公开导出所有指标
 pub use ma::MA;
@@ -82,3 +94,10 @@ pub use atr::ATR;
 pub use stochastic::{Stochastic, StochasticOutput};
 pub use obv::OBV;
 pub use adx::{ADX, ADXOutput};
+pub use roc::ROC;
+pub use cci::CCI;
+pub use williams_r::WilliamsR;
+pub use stddev::StdDev;
+pub use keltner::{KeltnerChannels, KeltnerChannelsOutput};
+pub use mfi::MFI;
+pub use vwap::VWAP;

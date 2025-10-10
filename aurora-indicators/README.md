@@ -82,9 +82,56 @@ if let Some(output) = stoch.update(110.0, 90.0, 100.0) {
 }
 ```
 
+#### 6. ROC (变动率指标)
+衡量当前价格相对于N周期前价格的变化百分比。
+
+```rust
+use aurora_indicators::ROC;
+
+let mut roc = ROC::new(10);
+for _ in 0..10 {
+    roc.update(100.0);
+}
+if let Some(roc_value) = roc.update(110.0) {
+    println!("ROC: {:.2}%", roc_value); // 输出: ROC: 10.00%
+}
+```
+
+#### 7. CCI (商品通道指数)
+衡量价格相对于统计平均值的偏离程度。
+
+```rust
+use aurora_indicators::CCI;
+
+let mut cci = CCI::new(20);
+if let Some(cci_value) = cci.update(110.0, 90.0, 100.0) {
+    if cci_value > 100.0 {
+        println!("超买! CCI = {:.2}", cci_value);
+    } else if cci_value < -100.0 {
+        println!("超卖! CCI = {:.2}", cci_value);
+    }
+}
+```
+
+#### 8. Williams %R (威廉指标)
+衡量收盘价在N周期高低区间中的相对位置。
+
+```rust
+use aurora_indicators::WilliamsR;
+
+let mut wr = WilliamsR::new(14);
+if let Some(wr_value) = wr.update(110.0, 90.0, 100.0) {
+    if WilliamsR::is_overbought(wr_value, -20.0) {
+        println!("超买! Williams %%R = {:.2}", wr_value);
+    } else if WilliamsR::is_oversold(wr_value, -80.0) {
+        println!("超卖! Williams %%R = {:.2}", wr_value);
+    }
+}
+```
+
 ### 波动率指标
 
-#### 6. Bollinger Bands (布林带)
+#### 9. Bollinger Bands (布林带)
 基于标准差的价格通道，衡量价格波动范围。
 
 ```rust
@@ -102,7 +149,7 @@ if let Some(bands) = bb.update(100.0) {
 }
 ```
 
-#### 7. ATR (平均真实波幅)
+#### 10. ATR (平均真实波幅)
 衡量市场波动程度，常用于设置止损位置。
 
 ```rust
@@ -119,9 +166,26 @@ if let Some(atr_value) = atr.update(110.0, 90.0, 100.0) {
 }
 ```
 
+#### 11. StdDev (标准差)
+衡量价格相对于平均值的离散程度，是布林带的基础。
+
+```rust
+use aurora_indicators::StdDev;
+
+let mut stddev = StdDev::new(20);
+if let Some(std_value) = stddev.update(100.0) {
+    println!("标准差: {:.2}", std_value);
+    
+    // 获取平均值
+    if let Some(mean) = stddev.mean() {
+        println!("平均值: {:.2}", mean);
+    }
+}
+```
+
 ### 成交量指标
 
-#### 8. OBV (能量潮)
+#### 12. OBV (能量潮)
 通过成交量变化预测价格趋势。
 
 ```rust
@@ -145,16 +209,22 @@ aurora-indicators/
 │   ├── ma/tests.rs         # MA 单元测试
 │   ├── ema.rs              # 指数移动平均线
 │   ├── ema/tests.rs        # EMA 单元测试
-│   ├── rsi.rs              # 相对强弱指数
-│   ├── rsi/tests.rs        # RSI 单元测试
-│   ├── bollinger.rs        # 布林带
-│   ├── bollinger/tests.rs  # Bollinger Bands 单元测试
 │   ├── macd.rs             # MACD
 │   ├── macd/tests.rs       # MACD 单元测试
-│   ├── atr.rs              # 平均真实波幅
-│   ├── atr/tests.rs        # ATR 单元测试
+│   ├── adx.rs              # 平均动向指数
+│   ├── adx/tests.rs        # ADX 单元测试
+│   ├── rsi.rs              # 相对强弱指数
+│   ├── rsi/tests.rs        # RSI 单元测试
 │   ├── stochastic.rs       # 随机震荡指标
 │   ├── stochastic/tests.rs # Stochastic 单元测试
+│   ├── roc.rs              # 变动率指标
+│   ├── cci.rs              # 商品通道指数
+│   ├── williams_r.rs       # 威廉指标
+│   ├── bollinger.rs        # 布林带
+│   ├── bollinger/tests.rs  # Bollinger Bands 单元测试
+│   ├── atr.rs              # 平均真实波幅
+│   ├── atr/tests.rs        # ATR 单元测试
+│   ├── stddev.rs           # 标准差
 │   ├── obv.rs              # 能量潮
 │   └── obv/tests.rs        # OBV 单元测试
 └── tests/
@@ -183,7 +253,7 @@ cargo test
 - 克隆和序列化
 - 错误处理（panic 测试）
 
-总计超过 120 个单元测试和 14 个集成测试。
+总计超过 189 个单元测试、26 个文档测试和 14 个集成测试。
 
 ## 设计原则
 
