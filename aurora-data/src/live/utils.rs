@@ -43,11 +43,14 @@ pub fn validate_kline(kline: &Kline) -> bool {
     true
 }
 
-/// 接收实时数据流的便利函数
-///
-/// 这是一个向后兼容的函数，提供了简单的接口来接收实时数据。
-/// 建议在新代码中使用BinanceLiveStream结构体。
-///
+/// 实时数据流的高级便利函数
+/// 
+/// 这是一个高级封装函数，为命令行工具和简单用例提供开箱即用的数据流功能。
+/// 它内部使用 BinanceLiveStream，但提供了更简单的接口，自动处理连接和数据循环。
+/// 
+/// 对于需要更精细控制的场景（如自定义错误处理、数据处理逻辑等），
+/// 建议直接使用 BinanceLiveStream 结构体。
+/// 
 /// # 参数
 ///
 /// * `symbol` - 交易对符号
@@ -64,7 +67,32 @@ pub fn validate_kline(kline: &Kline) -> bool {
 /// use aurora_data::live::stream_data;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// // 简单的命令行工具用法
 /// stream_data("BTCUSDT", "kline", "1m").await?;
+/// # Ok(())
+/// # }
+/// ```
+/// 
+/// # 与 BinanceLiveStream 的对比
+/// 
+/// ```rust,no_run
+/// use aurora_data::BinanceLiveStream;
+/// use aurora_core::DataSource;
+/// 
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// // 更精细的控制
+/// let mut stream = BinanceLiveStream::new();
+/// stream.connect(&["BTCUSDT"]).await?;
+/// 
+/// while let Some(kline) = stream.next_kline().await? {
+///     // 自定义处理逻辑
+///     println!("收到数据: {}", kline.close);
+///     
+///     // 可以根据条件退出
+///     if kline.close > 100000.0 {
+///         break;
+///     }
+/// }
 /// # Ok(())
 /// # }
 /// ```
@@ -80,11 +108,8 @@ pub async fn stream_data(symbol: &str, stream_type: &str, interval: &str) -> any
 
             loop {
                 match stream.next_kline().await {
-                    Ok(Some(kline)) => {
-                        info!(
-                            "📊 K线数据: 时间={}, 价格={}, 成交量={}",
-                            kline.timestamp, kline.close, kline.volume
-                        );
+                    Ok(Some(_kline)) => {
+                        // K线数据已在stream层记录，这里不再重复记录
                     }
                     Ok(None) => {
                         info!("连接已关闭");

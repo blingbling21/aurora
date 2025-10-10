@@ -199,7 +199,9 @@ fn test_memory_efficiency() {
 #[tokio::test]
 async fn test_error_handling_invalid_config() {
     // 测试无效配置的错误处理
-    let config = DataSourceConfig::new("invalid://url").with_timeout(5);
+    let config = DataSourceConfig::new("invalid://url")
+        .with_websocket("invalid://websocket.url")
+        .with_timeout(5);
     let mut stream = BinanceLiveStream::with_config(config);
 
     let result = stream.connect(&["BTCUSDT"]).await;
