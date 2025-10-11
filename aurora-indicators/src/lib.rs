@@ -23,6 +23,8 @@
 //! - **EMA (指数移动平均线)**: 对近期数据赋予更高权重的移动平均线
 //! - **MACD (移动平均收敛散度)**: 用于判断趋势变化和买卖时机
 //! - **ADX (平均动向指数)**: 衡量趋势强度但不判断方向
+//! - **PSAR (抛物线转向指标)**: 用于确定止损位和趋势反转点
+//! - **Ichimoku (一目均衡表)**: 综合性趋势系统，提供多维度市场信息
 //!
 //! ## 动量指标
 //! - **RSI (相对强弱指数)**: 衡量价格变动速度和幅度
@@ -41,6 +43,8 @@
 //! - **OBV (能量潮)**: 通过成交量变化预测价格趋势
 //! - **MFI (资金流量指数)**: 成交量加权的RSI
 //! - **VWAP (成交量加权平均价)**: 计算成交量加权的平均价格
+//! - **CMF (佳庆资金流)**: 衡量特定时期内资金流入和流出情况
+//! - **ADLine (累积/派发线)**: 通过价格和成交量关系识别供需变化
 //!
 //! # 设计原则
 //!
@@ -83,6 +87,10 @@ mod stddev;
 mod keltner;
 mod mfi;
 mod vwap;
+mod psar;
+mod ichimoku;
+mod cmf;
+mod adline;
 
 // 公开导出所有指标
 pub use ma::MA;
@@ -101,3 +109,7 @@ pub use stddev::StdDev;
 pub use keltner::{KeltnerChannels, KeltnerChannelsOutput};
 pub use mfi::MFI;
 pub use vwap::VWAP;
+pub use psar::{PSAR, PSAROutput};
+pub use ichimoku::{Ichimoku, IchimokuOutput};
+pub use cmf::CMF;
+pub use adline::ADLine;
