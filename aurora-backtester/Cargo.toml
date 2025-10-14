@@ -11,6 +11,7 @@ path = "src/lib.rs"
 aurora-core = { path = "../aurora-core" }
 aurora-strategy = { path = "../aurora-strategy" }
 aurora-portfolio = { path = "../aurora-portfolio" }
+aurora-config = { path = "../aurora-config", features = ["portfolio-integration"] }
 csv = "1.3"
 clap = { version = "4.4", features = ["derive"] }
 tracing = "0.1"
@@ -18,6 +19,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.0", features = ["full"] }
+
+[features]
+portfolio-integration = []
 
 [dev-dependencies]
 tempfile = "3.0"

@@ -66,6 +66,12 @@ Aurora是一个使用Rust构建的模块化、事件驱动的量化交易研究�
   - 模拟交易执行（纸上交易）
   - 实时账户监控和业绩追踪
 
+- **`aurora-config`** (库) - 配置管理
+  - 统一的TOML配置文件支持
+  - 数据源、策略、投资组合等完整配置
+  - 配置验证和默认值处理
+  - 支持多策略配置
+
 ### 架构特点
 
 - **模块化设计**: 各功能组件高度解耦，易于独立开发和测试
@@ -112,8 +118,11 @@ cargo run -p aurora-data -- stream --symbol BTCUSDT --stream-type trade
 
 #### 2. 历史回测 (aurora-backtester)
 ```bash
-# 运行MA交叉策略回测
+# 方式1: 使用命令行参数 (传统方式)
 cargo run -p aurora-backtester -- --data-path btc_1h.csv --short 10 --long 30 --initial-cash 10000
+
+# 方式2: 使用配置文件 (推荐)
+cargo run -p aurora-backtester -- --config examples/backtest_config.toml
 
 # 查看详细回测报告
 cargo run -p aurora-backtester -- --data-path btc_1h.csv --short 5 --long 20 --initial-cash 50000
@@ -121,12 +130,69 @@ cargo run -p aurora-backtester -- --data-path btc_1h.csv --short 5 --long 20 --i
 
 #### 3. 实时模拟交易 (aurora-live)
 ```bash
-# 启动实时模拟交易 - 支持7x24小时运行
+# 方式1: 使用命令行参数 (传统方式)
 cargo run -p aurora-live -- --symbol BTCUSDT --short 10 --long 30 --initial-cash 10000
+
+# 方式2: 使用配置文件 (推荐)
+cargo run -p aurora-live -- --config examples/live_config.toml
 
 # 使用不同策略参数
 cargo run -p aurora-live -- --symbol ETHUSDT --short 5 --long 20 --initial-cash 20000
 ```
+
+### 配置文件使用
+
+Aurora支持通过TOML配置文件管理所有参数,这对于复杂策略和重复运行非常方便。
+
+#### 创建配置文件
+```toml
+# my_strategy.toml
+
+# 数据源配置
+[data_source]
+provider = "binance"
+timeout = 30
+
+# 策略配置
+[[strategies]]
+name = "MA交叉策略"
+strategy_type = "ma-crossover"
+enabled = true
+
+[strategies.parameters]
+short = 10
+long = 30
+
+# 投资组合配置
+[portfolio]
+initial_cash = 10000.0
+commission = 0.001
+
+# 日志配置
+[logging]
+level = "info"
+format = "pretty"
+
+# 回测配置
+[backtest]
+data_path = "btc_1h.csv"
+symbol = "BTCUSDT"
+interval = "1h"
+```
+
+#### 使用配置文件
+```bash
+# 回测
+aurora-backtester --config my_strategy.toml
+
+# 实时交易
+aurora-live --config my_strategy.toml
+```
+
+更多配置示例请参考 `examples/` 目录:
+- `backtest_config.toml` - 回测配置示例
+- `live_config.toml` - 实时交易配置示例
+- `complete_config.toml` - 完整配置选项参考
 
 ## 核心概念
 

@@ -1,3 +1,17 @@
+// Copyright 2025 blingbling21
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! 投资组合管理核心模块
 
 use anyhow::Result;
@@ -5,6 +19,8 @@ use async_trait::async_trait;
 use tracing::{debug, info, warn};
 
 use crate::analytics::{EquityPoint, PerformanceMetrics, PortfolioAnalytics};
+use crate::position_manager::PositionManager;
+use crate::risk_manager::{RiskCheckResult, RiskManager};
 use crate::trade::Trade;
 
 /// 投资组合管理统一接口
@@ -75,7 +91,7 @@ pub trait Portfolio: Send + Sync {
 /// 基础投资组合实现
 ///
 /// 提供投资组合管理的标准实现，适用于大多数场景。
-/// 支持简单的全仓买卖策略，可以被扩展以支持更复杂的仓位管理。
+/// 支持可选的风险管理和仓位管理功能。
 #[derive(Debug, Clone)]
 pub struct BasePortfolio {
     /// 现金余额
@@ -90,6 +106,12 @@ pub struct BasePortfolio {
     equity_curve: Vec<EquityPoint>,
     /// 历史最高权益（用于计算回撤）
     max_equity: f64,
+    /// 风险管理器（可选）
+    risk_manager: Option<RiskManager>,
+    /// 仓位管理器（可选）
+    position_manager: Option<PositionManager>,
+    /// 当前持仓的入场价格（用于止损止盈计算）
+    entry_price: Option<f64>,
 }
 
 impl BasePortfolio {
@@ -116,7 +138,52 @@ impl BasePortfolio {
             trades: Vec::new(),
             equity_curve: Vec::new(),
             max_equity: initial_cash,
+            risk_manager: None,
+            position_manager: None,
+            entry_price: None,
         }
+    }
+
+    /// 设置风险管理器
+    ///
+    /// # 参数
+    ///
+    /// * `risk_manager` - 风险管理器实例
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// use aurora_portfolio::{BasePortfolio, RiskManager, RiskRules};
+    ///
+    /// let rules = RiskRules::new().with_max_drawdown(15.0);
+    /// let risk_manager = RiskManager::new(rules, 10000.0);
+    /// let portfolio = BasePortfolio::new(10000.0)
+    ///     .with_risk_manager(risk_manager);
+    /// ```
+    pub fn with_risk_manager(mut self, risk_manager: RiskManager) -> Self {
+        self.risk_manager = Some(risk_manager);
+        self
+    }
+
+    /// 设置仓位管理器
+    ///
+    /// # 参数
+    ///
+    /// * `position_manager` - 仓位管理器实例
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// use aurora_portfolio::{BasePortfolio, PositionManager, PositionSizingStrategy};
+    ///
+    /// let strategy = PositionSizingStrategy::FixedPercentage(0.2);
+    /// let position_manager = PositionManager::new(strategy);
+    /// let portfolio = BasePortfolio::new(10000.0)
+    ///     .with_position_manager(position_manager);
+    /// ```
+    pub fn with_position_manager(mut self, position_manager: PositionManager) -> Self {
+        self.position_manager = Some(position_manager);
+        self
     }
 
     /// 检查是否可以买入
@@ -139,14 +206,34 @@ impl BasePortfolio {
 
     /// 计算买入数量
     ///
-    /// 使用全部现金买入（简化处理）
+    /// 根据仓位管理器计算应使用的资金量，然后计算买入数量
     fn calculate_buy_quantity(&self, price: f64) -> f64 {
-        self.cash / price
+        let total_equity = self.get_total_equity(price);
+        
+        // 计算当前盈亏百分比（用于金字塔策略）
+        let current_profit = if self.initial_equity > 0.0 {
+            ((total_equity - self.initial_equity) / self.initial_equity) * 100.0
+        } else {
+            0.0
+        };
+        
+        // 如果有仓位管理器，使用它计算应使用的资金
+        let position_value = if let Some(ref pm) = self.position_manager {
+            pm.calculate_position_size(total_equity, current_profit)
+                .unwrap_or(self.cash)
+        } else {
+            // 默认全仓
+            self.cash
+        };
+        
+        // 确保不超过可用现金
+        let position_value = position_value.min(self.cash);
+        position_value / price
     }
 
     /// 计算卖出数量
     ///
-    /// 卖出全部持仓（简化处理）
+    /// 默认卖出全部持仓
     fn calculate_sell_quantity(&self) -> f64 {
         self.position
     }
@@ -172,12 +259,34 @@ impl Portfolio for BasePortfolio {
             return Err(anyhow::anyhow!("现金不足，无法买入"));
         }
 
+        // 风险检查
+        let current_equity = self.get_total_equity(price);
+        let drawdown = if self.max_equity > 0.0 {
+            ((self.max_equity - current_equity) / self.max_equity) * 100.0
+        } else {
+            0.0
+        };
+        
+        if let Some(ref mut risk_mgr) = self.risk_manager {
+            let risk_check = risk_mgr.check_risk(current_equity, drawdown, price);
+            if !risk_check.is_pass() {
+                warn!("风控拒绝买入: {:?}", risk_check.get_reason());
+                return Err(anyhow::anyhow!(
+                    "风控拒绝: {}",
+                    risk_check.get_reason().unwrap_or("未知原因")
+                ));
+            }
+        }
+
         let quantity = self.calculate_buy_quantity(price);
         let value = quantity * price;
 
         // 更新持仓和现金
         self.position += quantity;
-        self.cash = 0.0; // 全仓买入
+        self.cash -= value;
+        
+        // 记录入场价格（用于止损止盈）
+        self.entry_price = Some(price);
 
         // 创建交易记录
         let trade = Trade::new_buy(price, quantity, timestamp);
@@ -202,20 +311,60 @@ impl Portfolio for BasePortfolio {
             return Err(anyhow::anyhow!("无持仓，无法卖出"));
         }
 
+        // 风险检查（止损止盈）
+        let current_equity = self.get_total_equity(price);
+        let drawdown = if self.max_equity > 0.0 {
+            ((self.max_equity - current_equity) / self.max_equity) * 100.0
+        } else {
+            0.0
+        };
+        
+        if let Some(ref mut risk_mgr) = self.risk_manager {
+            let risk_check = risk_mgr.check_risk(current_equity, drawdown, price);
+            
+            // 对于卖出操作，如果触发止损或止盈，应该执行而不是拒绝
+            match risk_check {
+                RiskCheckResult::StopLoss(ref reason) => {
+                    info!("触发止损: {}", reason);
+                }
+                RiskCheckResult::TakeProfit(ref reason) => {
+                    info!("触发止盈: {}", reason);
+                }
+                _ => {
+                    // 其他风控条件在卖出时不阻止
+                }
+            }
+        }
+
         let quantity = self.calculate_sell_quantity();
         let value = quantity * price;
+        
+        // 计算本次交易的盈亏（用于风险管理器记录）
+        let is_profitable = if let Some(entry) = self.entry_price {
+            price > entry
+        } else {
+            false
+        };
 
         // 更新持仓和现金
         self.cash += value;
         self.position = 0.0; // 全部卖出
+        
+        // 清除入场价格
+        self.entry_price = None;
+        
+        // 记录交易结果到风险管理器
+        if let Some(ref mut risk_mgr) = self.risk_manager {
+            risk_mgr.record_trade_result(is_profitable);
+        }
 
         // 创建交易记录
         let trade = Trade::new_sell(price, quantity, timestamp);
         self.trades.push(trade.clone());
 
         info!(
-            "执行卖出: 价格={:.2}, 数量={:.6}, 总价值={:.2}",
-            price, quantity, value
+            "执行卖出: 价格={:.2}, 数量={:.6}, 总价值={:.2}, 盈亏={}",
+            price, quantity, value, if is_profitable { "盈利" } else { "亏损" }
         );
         debug!(
             "卖出后状态: 持仓={:.6}, 现金={:.2}",
@@ -293,79 +442,4 @@ impl Portfolio for BasePortfolio {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::TradeSide;
-
-    #[tokio::test]
-    async fn test_portfolio_creation() {
-        let portfolio = BasePortfolio::new(10000.0);
-
-        assert_eq!(portfolio.get_cash(), 10000.0);
-        assert_eq!(portfolio.get_position(), 0.0);
-        assert_eq!(portfolio.get_total_equity(100.0), 10000.0);
-        assert!(portfolio.get_trades().is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_buy_operation() {
-        let mut portfolio = BasePortfolio::new(10000.0);
-
-        let trade = portfolio.execute_buy(100.0, 1640995200000).await.unwrap();
-
-        assert_eq!(trade.side, TradeSide::Buy);
-        assert_eq!(trade.price, 100.0);
-        assert_eq!(trade.quantity, 100.0); // 10000 / 100
-        assert_eq!(portfolio.get_cash(), 0.0);
-        assert_eq!(portfolio.get_position(), 100.0);
-        assert_eq!(portfolio.get_trades().len(), 1);
-    }
-
-    #[tokio::test]
-    async fn test_sell_operation() {
-        let mut portfolio = BasePortfolio::new(10000.0);
-
-        // 先买入
-        portfolio.execute_buy(100.0, 1640995200000).await.unwrap();
-
-        // 再卖出
-        let trade = portfolio.execute_sell(105.0, 1640995260000).await.unwrap();
-
-        assert_eq!(trade.side, TradeSide::Sell);
-        assert_eq!(trade.price, 105.0);
-        assert_eq!(trade.quantity, 100.0);
-        assert_eq!(portfolio.get_cash(), 10500.0);
-        assert_eq!(portfolio.get_position(), 0.0);
-        assert_eq!(portfolio.get_trades().len(), 2);
-    }
-
-    #[tokio::test]
-    async fn test_equity_update() {
-        let mut portfolio = BasePortfolio::new(10000.0);
-
-        portfolio.execute_buy(100.0, 1640995200000).await.unwrap();
-        portfolio.update_equity(1640995260000, 105.0);
-
-        let equity_curve = portfolio.get_equity_curve();
-        assert_eq!(equity_curve.len(), 1);
-        assert_eq!(equity_curve[0].equity, 10500.0); // 100 * 105
-        assert_eq!(equity_curve[0].drawdown, 0.0);
-    }
-
-    #[tokio::test]
-    async fn test_invalid_operations() {
-        let mut portfolio = BasePortfolio::new(10000.0);
-
-        // 测试无持仓时卖出
-        let result = portfolio.execute_sell(100.0, 1640995200000).await;
-        assert!(result.is_err());
-
-        // 测试无效价格
-        let result = portfolio.execute_buy(-100.0, 1640995200000).await;
-        assert!(result.is_err());
-
-        // 测试无效时间戳
-        let result = portfolio.execute_buy(100.0, -1).await;
-        assert!(result.is_err());
-    }
-}
+mod tests;

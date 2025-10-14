@@ -11,6 +11,7 @@ path = "src/lib.rs"
 aurora-core = { path = "../aurora-core" }
 aurora-strategy = { path = "../aurora-strategy" }
 aurora-portfolio = { path = "../aurora-portfolio" }
+aurora-config = { path = "../aurora-config" }
 tokio = { version = "1.0", features = ["full"] }
 tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
 tracing = "0.1"

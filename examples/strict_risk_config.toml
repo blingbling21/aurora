@@ -1,0 +1,43 @@
+# Aurora 回测配置 - 测试严格风控
+
+[data_source]
+provider = "binance"
+timeout = 30
+max_retries = 3
+
+[[strategies]]
+name = "MA交叉策略"
+strategy_type = "ma-crossover"
+enabled = true
+
+[strategies.parameters]
+short = 10
+long = 30
+
+[portfolio]
+initial_cash = 10000.0
+commission = 0.001
+slippage = 0.0005
+
+# 更严格的风险管理规则
+[portfolio.risk_rules]
+max_drawdown_pct = 5.0          # 最大回撤限制降到5%
+max_daily_loss_pct = 2.0        # 单日最大亏损2%
+max_consecutive_losses = 2      # 连续亏损2次就停止
+min_equity = 9500.0             # 最低权益9500
+stop_loss_pct = 1.0             # 止损1%
+take_profit_pct = 3.0           # 止盈3%
+
+# 固定比例仓位策略（每次只用20%资金）
+[portfolio.position_sizing]
+strategy_type = "fixed_percentage"
+percentage = 0.2
+
+[logging]
+level = "info"
+format = "pretty"
+
+[backtest]
+data_path = "btc_1h.csv"
+symbol = "BTCUSDT"
+interval = "1h"

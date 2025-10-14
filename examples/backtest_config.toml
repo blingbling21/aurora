@@ -1,0 +1,137 @@
+# Aurora 配置文件示例 - 回测模式
+# 
+# 本配置文件展示了如何配置Aurora进行历史数据回测
+# 使用方法: aurora-backtester --config examples/backtest_config.toml
+
+# ==================== 数据源配置 ====================
+[data_source]
+# 数据提供商 (默认: binance)
+provider = "binance"
+
+# API超时时间(秒) (默认: 30)
+timeout = 30
+
+# 最大重试次数 (默认: 3)
+max_retries = 3
+
+# 可选: API密钥(如果需要访问私有API)
+# api_key = "your_api_key"
+# api_secret = "your_api_secret"
+
+# 可选: 自定义API端点
+# base_url = "https://api.binance.com"
+
+# ==================== 策略配置 ====================
+# 可以配置多个策略,但回测时只会使用第一个启用的策略
+
+[[strategies]]
+name = "MA交叉策略"
+strategy_type = "ma-crossover"
+enabled = true
+
+# 策略参数 (根据不同策略类型而不同)
+[strategies.parameters]
+short = 10      # 短期均线周期
+long = 30       # 长期均线周期
+
+# 示例: 禁用的备用策略
+# [[strategies]]
+# name = "MA交叉策略(慢速)"
+# strategy_type = "ma-crossover"
+# enabled = false
+# 
+# [strategies.parameters]
+# short = 20
+# long = 60
+
+# ==================== 投资组合配置 ====================
+[portfolio]
+# 初始资金 (必需)
+initial_cash = 10000.0
+
+# 手续费率 (0.001 = 0.1%)
+commission = 0.001
+
+# 滑点率 (0.0005 = 0.05%)
+slippage = 0.0005
+
+# 可选: 单笔最大交易金额
+# max_position_size = 5000.0
+
+# 可选: 最大持仓数量
+# max_positions = 3
+
+# --- 风险管理配置 (可选) ---
+# 如果不设置,则不启用风险控制
+[portfolio.risk_rules]
+# 最大回撤限制 (百分比)
+max_drawdown_pct = 15.0
+
+# 单日最大亏损限制 (百分比)
+max_daily_loss_pct = 5.0
+
+# 连续亏损次数限制
+max_consecutive_losses = 3
+
+# 账户最低权益要求
+min_equity = 5000.0
+
+# 止损百分比 (相对于入场价)
+stop_loss_pct = 2.0
+
+# 止盈百分比 (相对于入场价)
+take_profit_pct = 5.0
+
+# --- 仓位管理配置 (可选) ---
+# 如果不设置,默认使用全仓策略
+
+# 示例1: 固定比例策略 (使用20%资金)
+[portfolio.position_sizing]
+strategy_type = "fixed_percentage"
+percentage = 0.2
+
+# 示例2: Kelly准则策略
+# [portfolio.position_sizing]
+# strategy_type = "kelly_criterion"
+# win_rate = 0.6              # 历史胜率60%
+# profit_loss_ratio = 2.0     # 盈亏比2:1
+# kelly_fraction = 0.5        # 使用半凯利
+
+# 示例3: 金字塔加仓策略
+# [portfolio.position_sizing]
+# strategy_type = "pyramid"
+# initial_percentage = 0.1    # 初始10%仓位
+# profit_threshold = 5.0      # 盈利5%时加仓
+# max_percentage = 0.5        # 最大50%仓位
+# increment = 0.1             # 每次加仓10%
+
+# 示例4: 固定金额策略
+# [portfolio.position_sizing]
+# strategy_type = "fixed_amount"
+# amount = 1000.0             # 每次使用1000元
+
+# ==================== 日志配置 ====================
+[logging]
+# 日志级别: trace, debug, info, warn, error
+level = "info"
+
+# 日志格式: json, pretty
+format = "pretty"
+
+# 可选: 日志输出文件路径(不设置则输出到stdout)
+# output = "backtest.log"
+
+# ==================== 回测配置 ====================
+[backtest]
+# 数据文件路径 (必需)
+data_path = "btc_1h.csv"
+
+# 可选: 交易对符号(用于标识)
+symbol = "BTCUSDT"
+
+# 可选: 时间间隔(用于标识)
+interval = "1h"
+
+# 可选: 时间范围
+# start_time = "2024-01-01"
+# end_time = "2024-12-31"

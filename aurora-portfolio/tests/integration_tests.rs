@@ -1,7 +1,7 @@
 //! 集成测试 - 测试整个投资组合管理流程
 
 use aurora_portfolio::{
-    BasePortfolio, PerformanceMetrics, Portfolio, PortfolioAnalytics, Trade, TradeSide,
+    BasePortfolio, Portfolio, PortfolioAnalytics, TradeSide,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -250,4 +250,205 @@ async fn test_high_frequency_trading_performance() {
 
     // 验证权益曲线
     assert_eq!(portfolio.get_equity_curve().len(), 100);
+}
+
+/// 测试风险管理功能
+#[tokio::test]
+async fn test_risk_management() {
+    use aurora_portfolio::{RiskManager, RiskRules};
+
+    // 创建投资组合
+    let _portfolio = BasePortfolio::new(10000.0);
+    
+    // 配置风险规则
+    let rules = RiskRules::new()
+        .with_max_drawdown(15.0)
+        .with_max_consecutive_losses(3)
+        .with_min_equity(5000.0);
+    
+    let mut risk_manager = RiskManager::new(rules, 10000.0);
+    
+    // 测试正常情况 - 风险检查应通过
+    let result = risk_manager.check_risk(9500.0, 5.0, 100.0);
+    assert!(result.is_pass());
+    
+    // 模拟连续亏损
+    risk_manager.record_trade_result(false);
+    risk_manager.record_trade_result(false);
+    risk_manager.record_trade_result(false);
+    
+    // 应触发连续亏损限制
+    let result = risk_manager.check_risk(9000.0, 10.0, 95.0);
+    assert!(!result.is_pass());
+    assert!(risk_manager.should_stop_trading());
+    
+    // 测试止损触发
+    let rules2 = RiskRules::new().with_stop_loss_price(95.0);
+    let mut risk_manager2 = RiskManager::new(rules2, 10000.0);
+    
+    let result = risk_manager2.check_risk(10000.0, 0.0, 94.0);
+    assert!(!result.is_pass());
+    
+    // 测试止盈触发
+    let rules3 = RiskRules::new().with_take_profit_price(110.0);
+    let mut risk_manager3 = RiskManager::new(rules3, 10000.0);
+    
+    let result = risk_manager3.check_risk(11000.0, 0.0, 112.0);
+    assert!(!result.is_pass());
+}
+
+/// 测试仓位管理功能
+#[test]
+fn test_position_sizing() {
+    use aurora_portfolio::{PositionManager, PositionSizingStrategy};
+    
+    // 测试固定金额策略
+    let manager1 = PositionManager::new(PositionSizingStrategy::FixedAmount(1000.0));
+    let size = manager1.calculate_position_size(10000.0, 0.0).unwrap();
+    assert_eq!(size, 1000.0);
+    
+    // 测试固定比例策略
+    let manager2 = PositionManager::new(PositionSizingStrategy::FixedPercentage(0.2));
+    let size = manager2.calculate_position_size(10000.0, 0.0).unwrap();
+    assert_eq!(size, 2000.0);
+    
+    // 测试Kelly准则
+    let manager3 = PositionManager::new(PositionSizingStrategy::KellyCriterion {
+        win_rate: 0.6,
+        profit_loss_ratio: 2.0,
+        kelly_fraction: 0.5,
+    });
+    let size = manager3.calculate_position_size(10000.0, 0.0).unwrap();
+    assert!((size - 2000.0).abs() < 0.01); // Kelly = 40%, 半凯利 = 20%
+    
+    // 测试金字塔策略
+    let manager4 = PositionManager::new(PositionSizingStrategy::Pyramid {
+        initial_percentage: 0.1,
+        profit_threshold: 5.0,
+        max_percentage: 0.5,
+        increment: 0.1,
+    });
+    
+    // 无盈利
+    let size1 = manager4.calculate_position_size(10000.0, 0.0).unwrap();
+    assert_eq!(size1, 1000.0);
+    
+    // 盈利6%, 触发一次加仓
+    let size2 = manager4.calculate_position_size(10000.0, 6.0).unwrap();
+    assert_eq!(size2, 2000.0);
+}
+
+/// 测试订单管理功能
+#[test]
+fn test_order_management() {
+    use aurora_portfolio::{Order, OrderType, OrderSide, OrderStatus};
+    
+    // 创建市价单
+    let mut market_order = Order::new(
+        OrderType::Market,
+        OrderSide::Buy,
+        10.0,
+        1640995200000,
+    );
+    
+    assert!(market_order.should_trigger(100.0));
+    assert!(market_order.is_pending());
+    
+    market_order.trigger();
+    assert_eq!(market_order.status, OrderStatus::Triggered);
+    
+    market_order.execute(100.5, 1640995260000);
+    assert!(market_order.is_executed());
+    assert_eq!(market_order.executed_price, Some(100.5));
+    
+    // 创建止损单
+    let stop_loss_order = Order::new(
+        OrderType::StopLoss(95.0),
+        OrderSide::Sell,
+        10.0,
+        1640995200000,
+    );
+    
+    assert!(!stop_loss_order.should_trigger(100.0)); // 未触发
+    assert!(stop_loss_order.should_trigger(94.0));   // 触发
+    
+    // 创建止盈单
+    let take_profit_order = Order::new(
+        OrderType::TakeProfit(110.0),
+        OrderSide::Sell,
+        10.0,
+        1640995200000,
+    );
+    
+    assert!(!take_profit_order.should_trigger(105.0)); // 未触发
+    assert!(take_profit_order.should_trigger(112.0));  // 触发
+}
+
+/// 完整场景测试: 集成风控和仓位管理
+#[tokio::test]
+async fn test_complete_risk_management_flow() {
+    use aurora_portfolio::{
+        RiskManager, RiskRules, PositionManager, PositionSizingStrategy,
+    };
+    
+    // 1. 创建投资组合
+    let mut portfolio = BasePortfolio::new(10000.0);
+    
+    // 2. 配置风险规则
+    let risk_rules = RiskRules::new()
+        .with_max_drawdown(15.0)
+        .with_max_consecutive_losses(3)
+        .with_min_equity(5000.0);
+    
+    let mut risk_manager = RiskManager::new(risk_rules, 10000.0);
+    
+    // 3. 配置仓位管理 (使用20%固定比例)
+    let position_manager = PositionManager::new(
+        PositionSizingStrategy::FixedPercentage(0.2)
+    );
+    
+    let current_price = 100.0;
+    let timestamp = 1640995200000;
+    
+    // 4. 执行风险检查
+    let current_equity = portfolio.get_total_equity(current_price);
+    let risk_result = risk_manager.check_risk(current_equity, 0.0, current_price);
+    assert!(risk_result.is_pass());
+    
+    // 5. 计算仓位大小
+    let position_size = position_manager
+        .calculate_position_size(current_equity, 0.0)
+        .unwrap();
+    assert_eq!(position_size, 2000.0); // 20% of 10000
+    
+    // 6. 设置止损止盈
+    risk_manager.set_stop_loss_take_profit(current_price, 2.0, 5.0);
+    assert_eq!(risk_manager.get_rules().stop_loss_price, Some(98.0));
+    assert_eq!(risk_manager.get_rules().take_profit_price, Some(105.0));
+    
+    // 7. 执行买入 (这里简化为全仓买入)
+    let trade = portfolio.execute_buy(current_price, timestamp).await.unwrap();
+    assert!(trade.value > 0.0);
+    
+    // 8. 模拟价格上涨触发止盈
+    portfolio.update_equity(timestamp + 60000, 106.0);
+    let result = risk_manager.check_risk(
+        portfolio.get_total_equity(106.0),
+        0.0,
+        106.0,
+    );
+    assert!(!result.is_pass()); // 应触发止盈
+    
+    // 9. 执行卖出
+    let sell_trade = portfolio.execute_sell(106.0, timestamp + 60000).await.unwrap();
+    assert_eq!(sell_trade.price, 106.0);
+    
+    // 10. 记录盈利交易
+    risk_manager.record_trade_result(true);
+    assert_eq!(risk_manager.get_consecutive_wins(), 1);
+    assert_eq!(risk_manager.get_consecutive_losses(), 0);
+    
+    // 验证最终权益增加
+    let final_equity = portfolio.get_total_equity(106.0);
+    assert!(final_equity > 10000.0);
 }

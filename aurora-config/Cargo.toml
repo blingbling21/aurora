@@ -1,0 +1,25 @@
+[package]
+name = "aurora-config"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "aurora_config"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+
+# 可选的 portfolio 集成,用于类型转换
+aurora-portfolio = { path = "../aurora-portfolio", optional = true }
+
+[features]
+# 启用与 aurora-portfolio 的集成
+portfolio-integration = ["aurora-portfolio"]
+
+[dev-dependencies]
+tempfile = "3.0"

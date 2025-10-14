@@ -2,12 +2,26 @@
 
 use anyhow::Result;
 use aurora_backtester::engine::{BacktestEngine, run_backtest};
+use aurora_config::PortfolioConfig;
 use aurora_core::Kline;
 use aurora_portfolio::Portfolio;
 use aurora_strategy::MACrossoverStrategy;
 use std::fs::File;
 use std::io::Write;
 use tempfile::{TempDir, tempdir};
+
+/// 创建默认的测试用 PortfolioConfig
+fn create_test_portfolio_config(initial_cash: f64) -> PortfolioConfig {
+    PortfolioConfig {
+        initial_cash,
+        commission: 0.001,
+        slippage: 0.0005,
+        max_position_size: None,
+        max_positions: None,
+        risk_rules: None,
+        position_sizing: None,
+    }
+}
 
 /// 创建测试用的CSV数据文件
 fn create_test_csv_file() -> Result<(String, TempDir)> {
@@ -48,7 +62,8 @@ fn create_test_csv_file() -> Result<(String, TempDir)> {
 #[tokio::test]
 async fn test_backtest_engine_basic() -> Result<()> {
     let strategy = MACrossoverStrategy::new(2, 3);
-    let engine = BacktestEngine::new(strategy, 10000.0);
+    let portfolio_config = create_test_portfolio_config(10000.0);
+    let engine = BacktestEngine::new(strategy, &portfolio_config)?;
 
     // 验证初始状态
     assert_eq!(engine.portfolio().get_cash(), 10000.0);
@@ -63,7 +78,8 @@ async fn test_complete_backtest_flow() -> Result<()> {
     let (csv_file, _temp_dir) = create_test_csv_file()?;
 
     // 运行回测
-    let result = run_backtest(&csv_file, "ma-crossover", 2, 3, 10000.0).await;
+    let portfolio_config = create_test_portfolio_config(10000.0);
+    let result = run_backtest(&csv_file, "ma-crossover", 2, 3, &portfolio_config).await;
     assert!(result.is_ok());
 
     Ok(())
@@ -73,7 +89,8 @@ async fn test_complete_backtest_flow() -> Result<()> {
 #[tokio::test]
 async fn test_kline_processing() -> Result<()> {
     let strategy = MACrossoverStrategy::new(2, 3);
-    let mut engine = BacktestEngine::new(strategy, 10000.0);
+    let portfolio_config = create_test_portfolio_config(10000.0);
+    let mut engine = BacktestEngine::new(strategy, &portfolio_config)?;
 
     // 创建测试K线数据
     let klines = vec![
@@ -115,13 +132,15 @@ async fn test_kline_processing() -> Result<()> {
 /// 测试CSV文件加载错误处理
 #[tokio::test]
 async fn test_csv_loading_errors() {
+    let portfolio_config = create_test_portfolio_config(10000.0);
+    
     // 测试不存在的文件
-    let result = run_backtest("nonexistent_file.csv", "ma-crossover", 5, 20, 10000.0).await;
+    let result = run_backtest("nonexistent_file.csv", "ma-crossover", 5, 20, &portfolio_config).await;
     assert!(result.is_err());
 
     // 测试无效的策略名称
     let (csv_file, _temp_dir) = create_test_csv_file().unwrap();
-    let result = run_backtest(&csv_file, "invalid-strategy", 5, 20, 10000.0).await;
+    let result = run_backtest(&csv_file, "invalid-strategy", 5, 20, &portfolio_config).await;
     assert!(result.is_err());
 }
 
@@ -134,7 +153,8 @@ async fn test_empty_data_file() -> Result<()> {
     let mut file = File::create(&file_path)?;
     writeln!(file, "timestamp,open,high,low,close,volume")?; // 只有头部
 
-    let result = run_backtest(&file_path.to_string_lossy(), "ma-crossover", 5, 20, 10000.0).await;
+    let portfolio_config = create_test_portfolio_config(10000.0);
+    let result = run_backtest(&file_path.to_string_lossy(), "ma-crossover", 5, 20, &portfolio_config).await;
 
     assert!(result.is_err());
 
@@ -153,7 +173,8 @@ async fn test_invalid_csv_data() -> Result<()> {
     writeln!(file, "invalid,data,here,bad,format,wrong")?;
     writeln!(file, "1640995200000,50000.0,50500.0,49500.0,50000.0,100.0")?; // 一行有效数据
 
-    let result = run_backtest(&file_path.to_string_lossy(), "ma-crossover", 2, 3, 10000.0).await;
+    let portfolio_config = create_test_portfolio_config(10000.0);
+    let result = run_backtest(&file_path.to_string_lossy(), "ma-crossover", 2, 3, &portfolio_config).await;
 
     // 应该能处理部分无效数据，只要有一些有效数据
     assert!(result.is_ok());
@@ -165,11 +186,12 @@ async fn test_invalid_csv_data() -> Result<()> {
 #[tokio::test]
 async fn test_different_strategy_parameters() -> Result<()> {
     let (csv_file, _temp_dir) = create_test_csv_file()?;
+    let portfolio_config = create_test_portfolio_config(10000.0);
 
     let test_cases = vec![(5, 10), (10, 20), (2, 5)];
 
     for (short, long) in test_cases {
-        let result = run_backtest(&csv_file, "ma-crossover", short, long, 10000.0).await;
+        let result = run_backtest(&csv_file, "ma-crossover", short, long, &portfolio_config).await;
         assert!(result.is_ok(), "策略参数 {}:{} 回测失败", short, long);
     }
 
@@ -184,7 +206,8 @@ async fn test_different_initial_cash() -> Result<()> {
     let cash_amounts = vec![1000.0, 10000.0, 100000.0];
 
     for cash in cash_amounts {
-        let result = run_backtest(&csv_file, "ma-crossover", 5, 10, cash).await;
+        let portfolio_config = create_test_portfolio_config(cash);
+        let result = run_backtest(&csv_file, "ma-crossover", 5, 10, &portfolio_config).await;
         assert!(result.is_ok(), "初始资金 {} 回测失败", cash);
     }
 
@@ -225,12 +248,13 @@ async fn test_large_dataset_performance() -> Result<()> {
 
     // 运行回测
     let backtest_start = std::time::Instant::now();
+    let portfolio_config = create_test_portfolio_config(100000.0);
     let result = run_backtest(
         &file_path.to_string_lossy(),
         "ma-crossover",
         10,
         30,
-        100000.0,
+        &portfolio_config,
     )
     .await;
 
@@ -249,7 +273,8 @@ async fn test_large_dataset_performance() -> Result<()> {
 #[tokio::test]
 async fn test_backtest_result_correctness() -> Result<()> {
     let strategy = MACrossoverStrategy::new(2, 3);
-    let mut engine = BacktestEngine::new(strategy, 10000.0);
+    let portfolio_config = create_test_portfolio_config(10000.0);
+    let mut engine = BacktestEngine::new(strategy, &portfolio_config)?;
 
     // 创建明确的趋势数据，应该产生交易信号
     let klines = vec![
@@ -352,7 +377,8 @@ async fn test_backtest_result_correctness() -> Result<()> {
 #[tokio::test]
 async fn test_backtest_engine_state_management() -> Result<()> {
     let strategy = MACrossoverStrategy::new(5, 10);
-    let engine = BacktestEngine::new(strategy, 50000.0);
+    let portfolio_config = create_test_portfolio_config(50000.0);
+    let engine = BacktestEngine::new(strategy, &portfolio_config)?;
 
     // 验证初始状态
     assert_eq!(engine.portfolio().get_cash(), 50000.0);
@@ -374,12 +400,13 @@ async fn test_concurrent_backtests() -> Result<()> {
     for i in 0..3 {
         let file_clone = csv_file.clone();
         let task = tokio::spawn(async move {
+            let portfolio_config = create_test_portfolio_config(10000.0 + (i as f64 * 1000.0));
             run_backtest(
                 &file_clone,
                 "ma-crossover",
                 5,
                 10,
-                10000.0 + (i as f64 * 1000.0),
+                &portfolio_config,
             )
             .await
         });

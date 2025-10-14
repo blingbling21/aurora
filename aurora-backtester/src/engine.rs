@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow};
+use aurora_config::PortfolioConfig;
 use aurora_core::{Kline, MarketEvent, Signal, Strategy};
 use aurora_portfolio::{BasePortfolio, Portfolio};
 use aurora_strategy::MACrossoverStrategy;
@@ -11,7 +12,7 @@ pub async fn run_backtest(
     strategy_name: &str,
     short_period: usize,
     long_period: usize,
-    initial_cash: f64,
+    portfolio_config: &PortfolioConfig,
 ) -> Result<()> {
     // 验证数据文件是否存在
     if !Path::new(data_path).exists() {
@@ -34,11 +35,11 @@ pub async fn run_backtest(
 
     info!(
         "初始化回测引擎，策略: {}, 参数: {}:{}, 初始资金: {:.2}",
-        strategy_name, short_period, long_period, initial_cash
+        strategy_name, short_period, long_period, portfolio_config.initial_cash
     );
 
     // 创建回测引擎并运行
-    let mut engine = BacktestEngine::new(strategy, initial_cash);
+    let mut engine = BacktestEngine::new(strategy, portfolio_config)?;
     engine.run(&klines).await?;
 
     Ok(())
@@ -73,11 +74,34 @@ pub struct BacktestEngine {
 
 impl BacktestEngine {
     /// 创建新的回测引擎
-    pub fn new(strategy: MACrossoverStrategy, initial_cash: f64) -> Self {
-        Self {
-            strategy,
-            portfolio: BasePortfolio::new(initial_cash),
+    ///
+    /// # 参数
+    ///
+    /// * `strategy` - 交易策略
+    /// * `portfolio_config` - 投资组合配置（包含风险管理和仓位管理规则）
+    pub fn new(strategy: MACrossoverStrategy, portfolio_config: &PortfolioConfig) -> Result<Self> {
+        let mut portfolio = BasePortfolio::new(portfolio_config.initial_cash);
+        
+        // 配置风险管理器（如果提供）
+        if let Some(ref risk_rules_config) = portfolio_config.risk_rules {
+            let risk_rules = risk_rules_config.to_risk_rules();
+            let risk_manager = aurora_portfolio::RiskManager::new(risk_rules, portfolio_config.initial_cash);
+            portfolio = portfolio.with_risk_manager(risk_manager);
+            info!("已启用风险管理");
         }
+        
+        // 配置仓位管理器（如果提供）
+        if let Some(ref position_sizing_config) = portfolio_config.position_sizing {
+            let position_strategy = position_sizing_config.to_position_sizing_strategy();
+            let position_manager = aurora_portfolio::PositionManager::new(position_strategy);
+            portfolio = portfolio.with_position_manager(position_manager);
+            info!("已启用仓位管理");
+        }
+        
+        Ok(Self {
+            strategy,
+            portfolio,
+        })
     }
 
     /// 运行回测
@@ -174,6 +198,18 @@ mod tests {
     use std::io::Write;
     use tempfile::{TempDir, tempdir};
 
+    fn create_test_portfolio_config() -> PortfolioConfig {
+        PortfolioConfig {
+            initial_cash: 10000.0,
+            commission: 0.001,
+            slippage: 0.0005,
+            max_position_size: None,
+            max_positions: None,
+            risk_rules: None,
+            position_sizing: None,
+        }
+    }
+
     fn create_test_csv() -> Result<(String, TempDir)> {
         let dir = tempdir()?;
         let file_path = dir.path().join("test_data.csv");
@@ -208,7 +244,8 @@ mod tests {
         let klines = load_klines_from_csv(&csv_path).unwrap();
 
         let strategy = MACrossoverStrategy::new(2, 3);
-        let mut engine = BacktestEngine::new(strategy, 10000.0);
+        let portfolio_config = create_test_portfolio_config();
+        let mut engine = BacktestEngine::new(strategy, &portfolio_config).unwrap();
 
         let result = engine.run(&klines).await;
         assert!(result.is_ok());

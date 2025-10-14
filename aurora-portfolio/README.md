@@ -1,10 +1,10 @@
 # Aurora Portfolio
 
-Aurora 投资组合管理库 - 为量化交易系统提供专业的资金和持仓管理
+Aurora 投资组合管理库 - 为量化交易系统提供专业的资金管理、风险控制和业绩分析
 
 ## 概述
 
-`aurora-portfolio` 是 Aurora 量化交易框架的投资组合管理组件，提供完整的交易执行、资金管理、持仓跟踪和业绩分析功能。它采用统一的接口设计，同时支持回测和实时交易环境，是构建量化交易系统的核心模块之一。
+`aurora-portfolio` 是 Aurora 量化交易框架的投资组合管理组件，提供完整的交易执行、资金管理、持仓跟踪、风险控制和业绩分析功能。它采用统一的接口设计，同时支持回测和实时交易环境，是构建量化交易系统的核心模块之一。
 
 ## 主要功能
 
@@ -13,12 +13,36 @@ Aurora 投资组合管理库 - 为量化交易系统提供专业的资金和持�
 - 持仓数量跟踪
 - 总权益实时计算
 - 交易记录保存
+- 权益曲线跟踪
 
 ### 📈 交易执行
-- 买入操作执行
-- 卖出操作执行
-- 参数验证
-- 错误处理
+- 多种订单类型支持（市价单、限价单、止损单、止盈单）
+- 买入/卖出操作执行
+- 订单状态管理
+- 参数验证和错误处理
+
+### 🛡️ 风险管理
+- **投资组合层风控**
+  - 最大回撤限制
+  - 单日最大亏损限制
+  - 连续亏损次数限制
+  - 账户最低权益保护
+- **订单层风控**
+  - 止损价格设置
+  - 止盈价格设置
+  - 自动触发机制
+- **风险监控**
+  - 实时风险检查
+  - 自动停止交易
+  - 风险日志记录
+
+### 💰 仓位管理
+- **固定金额策略** - 每次使用固定金额交易
+- **固定比例策略** - 按账户权益的固定比例分配
+- **Kelly准则** - 根据胜率和盈亏比动态调整仓位
+- **金字塔加仓** - 在盈利时逐步增加仓位
+- 支持杠杆设置
+- 最小交易金额保护
 
 ### 📊 业绩分析
 - 总收益率计算
@@ -27,12 +51,6 @@ Aurora 投资组合管理库 - 为量化交易系统提供专业的资金和持�
 - 夏普比率
 - 胜率统计
 - 盈亏比计算
-
-### 📉 风险管理
-- 权益曲线跟踪
-- 回撤监控
-- 资金检查
-- 交易验证
 
 ## 核心组件
 
@@ -225,7 +243,7 @@ for point in equity_curve {
 
 ## 使用示例
 
-### 基本用法
+### 基本用法 - 简单交易
 
 ```rust
 use aurora_portfolio::{Portfolio, BasePortfolio};
@@ -800,9 +818,278 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## 风险管理功能
+
+### RiskManager - 风险管理器
+
+提供投资组合级别的风险控制功能:
+
+```rust
+use aurora_portfolio::{RiskManager, RiskRules};
+
+// 创建风险规则
+let rules = RiskRules::new()
+    .with_max_drawdown(15.0)           // 最大回撤15%
+    .with_max_daily_loss(5.0)          // 单日最大亏损5%
+    .with_max_consecutive_losses(3)    // 最多连续亏损3次
+    .with_min_equity(5000.0);          // 最低权益5000
+
+let mut risk_manager = RiskManager::new(rules, 10000.0);
+
+// 执行风险检查
+let result = risk_manager.check_risk(9500.0, 5.0, 100.0);
+if result.is_pass() {
+    println!("风险检查通过,可以继续交易");
+} else if let Some(reason) = result.get_reason() {
+    println!("风险检查未通过: {}", reason);
+}
+
+// 记录交易结果
+risk_manager.record_trade_result(false); // 记录亏损
+println!("连续亏损次数: {}", risk_manager.get_consecutive_losses());
+
+// 检查是否应停止交易
+if risk_manager.should_stop_trading() {
+    println!("触发风控规则,停止交易!");
+}
+```
+
+### 止损止盈设置
+
+```rust
+use aurora_portfolio::RiskManager;
+
+let mut risk_manager = RiskManager::new(RiskRules::new(), 10000.0);
+
+// 设置止损止盈(入场价100,止损2%,止盈5%)
+risk_manager.set_stop_loss_take_profit(100.0, 2.0, 5.0);
+
+// 检查是否触发
+let result = risk_manager.check_risk(10000.0, 0.0, 97.0);
+if !result.is_pass() {
+    println!("触发止损!");
+}
+
+let result2 = risk_manager.check_risk(10000.0, 0.0, 106.0);
+if !result2.is_pass() {
+    println!("触发止盈!");
+}
+```
+
+### Order - 订单管理
+
+支持多种订单类型:
+
+```rust
+use aurora_portfolio::{Order, OrderType, OrderSide};
+
+// 创建市价买入订单
+let market_order = Order::new(
+    OrderType::Market,
+    OrderSide::Buy,
+    10.0,
+    1640995200000,
+);
+
+// 创建限价卖出订单
+let limit_order = Order::new(
+    OrderType::Limit(105.0),
+    OrderSide::Sell,
+    10.0,
+    1640995200000,
+);
+
+// 创建止损订单
+let stop_loss_order = Order::new(
+    OrderType::StopLoss(95.0),
+    OrderSide::Sell,
+    10.0,
+    1640995200000,
+);
+
+// 创建止盈订单
+let take_profit_order = Order::new(
+    OrderType::TakeProfit(110.0),
+    OrderSide::Sell,
+    10.0,
+    1640995200000,
+);
+
+// 检查订单是否应触发
+if market_order.should_trigger(100.0) {
+    println!("市价单立即触发");
+}
+
+if stop_loss_order.should_trigger(94.0) {
+    println!("价格跌破止损价,触发止损订单");
+}
+```
+
+## 仓位管理功能
+
+### PositionManager - 仓位管理器
+
+提供多种仓位管理策略:
+
+#### 1. 固定金额策略
+
+```rust
+use aurora_portfolio::{PositionManager, PositionSizingStrategy};
+
+let manager = PositionManager::new(
+    PositionSizingStrategy::FixedAmount(1000.0)
+);
+
+let size = manager.calculate_position_size(10000.0, 0.0)?;
+println!("建议仓位: {:.2}", size); // 总是1000
+```
+
+#### 2. 固定比例策略
+
+```rust
+let manager = PositionManager::new(
+    PositionSizingStrategy::FixedPercentage(0.2) // 使用20%资金
+);
+
+let size = manager.calculate_position_size(10000.0, 0.0)?;
+println!("建议仓位: {:.2}", size); // 2000 (10000 * 0.2)
+```
+
+#### 3. Kelly准则策略
+
+```rust
+let manager = PositionManager::new(
+    PositionSizingStrategy::KellyCriterion {
+        win_rate: 0.6,           // 胜率60%
+        profit_loss_ratio: 2.0,  // 盈亏比2:1
+        kelly_fraction: 0.5,     // 使用半凯利(更保守)
+    }
+);
+
+let size = manager.calculate_position_size(10000.0, 0.0)?;
+println!("Kelly建议仓位: {:.2}", size);
+```
+
+#### 4. 金字塔加仓策略
+
+```rust
+let manager = PositionManager::new(
+    PositionSizingStrategy::Pyramid {
+        initial_percentage: 0.1,  // 初始10%仓位
+        profit_threshold: 5.0,    // 盈利5%时加仓
+        max_percentage: 0.5,      // 最大50%仓位
+        increment: 0.1,           // 每次加仓10%
+    }
+);
+
+// 无盈利时
+let size1 = manager.calculate_position_size(10000.0, 0.0)?;
+println!("初始仓位: {:.2}", size1); // 1000 (10%)
+
+// 盈利6%时,触发一次加仓
+let size2 = manager.calculate_position_size(10000.0, 6.0)?;
+println!("加仓后仓位: {:.2}", size2); // 2000 (20%)
+```
+
+#### 5. 使用杠杆
+
+```rust
+let manager = PositionManager::new(
+    PositionSizingStrategy::FixedPercentage(0.5)
+)
+.with_max_leverage(2.0)              // 2倍杠杆
+.with_min_position_value(50.0);      // 最小50单位
+
+let size = manager.calculate_position_size(10000.0, 0.0)?;
+println!("含杠杆仓位: {:.2}", size); // 10000 (50% * 2倍杠杆)
+```
+
+## 完整示例:集成风控和仓位管理
+
+```rust
+use aurora_portfolio::{
+    Portfolio, BasePortfolio, RiskManager, RiskRules,
+    PositionManager, PositionSizingStrategy,
+};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // 1. 创建投资组合
+    let mut portfolio = BasePortfolio::new(10000.0);
+    
+    // 2. 配置风险规则
+    let risk_rules = RiskRules::new()
+        .with_max_drawdown(15.0)
+        .with_max_consecutive_losses(3)
+        .with_min_equity(5000.0);
+    
+    let mut risk_manager = RiskManager::new(risk_rules, 10000.0);
+    
+    // 3. 配置仓位管理
+    let position_manager = PositionManager::new(
+        PositionSizingStrategy::FixedPercentage(0.2)
+    );
+    
+    // 模拟交易流程
+    let current_price = 100.0;
+    let current_equity = portfolio.get_total_equity(current_price);
+    
+    // 4. 风险检查
+    let risk_result = risk_manager.check_risk(
+        current_equity,
+        0.0, // 当前回撤
+        current_price,
+    );
+    
+    if !risk_result.is_pass() {
+        println!("风险检查未通过,停止交易");
+        return Ok(());
+    }
+    
+    // 5. 计算仓位大小
+    let position_size = position_manager.calculate_position_size(
+        current_equity,
+        0.0, // 当前盈亏
+    )?;
+    
+    println!("建议使用资金: {:.2}", position_size);
+    
+    // 6. 设置止损止盈
+    risk_manager.set_stop_loss_take_profit(
+        current_price,
+        2.0,  // 止损2%
+        5.0,  // 止盈5%
+    );
+    
+    // 7. 执行交易
+    let trade = portfolio.execute_buy(current_price, 1640995200000).await?;
+    println!("买入成功: 数量={:.6}", trade.quantity);
+    
+    // 8. 记录交易结果(示例)
+    risk_manager.record_trade_result(true); // 盈利
+    
+    // 9. 更新权益和检查风控
+    portfolio.update_equity(1640995260000, 105.0);
+    let result = risk_manager.check_risk(
+        portfolio.get_total_equity(105.0),
+        0.0,
+        105.0,
+    );
+    
+    if !result.is_pass() {
+        println!("触发止盈,卖出!");
+        portfolio.execute_sell(105.0, 1640995260000).await?;
+    }
+    
+    Ok(())
+}
+```
+
 ## 后续建议
 
-1. **风险管理**: 可以在 `aurora-portfolio` 中添加止损、仓位控制等功能
-2. **多资产支持**: 扩展为支持多种资产的投资组合管理
-3. **实时交易**: 为实时交易环境优化异步操作
-4. **更多指标**: 添加更多业绩和风险分析指标
+1. ✅ **风险管理**: 已实现止损止盈、回撤限制、连续亏损控制等完整风控功能
+2. ✅ **仓位管理**: 已实现固定金额、固定比例、Kelly准则、金字塔加仓等多种策略
+3. **多资产支持**: 扩展为支持多种资产的投资组合管理
+4. **实时交易**: 为实时交易环境优化异步操作
+5. **更多指标**: 添加更多业绩和风险分析指标
+6. **订单簿管理**: 实现完整的订单簿和订单生命周期管理
