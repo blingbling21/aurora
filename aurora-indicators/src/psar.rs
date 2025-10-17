@@ -46,8 +46,8 @@
 //! let result2 = psar.update(102.0, 97.0, 101.0);
 //! let result3 = psar.update(105.0, 100.0, 104.0);
 //!
-//! if let Some(sar_value) = result3 {
-//!     println!("当前 SAR 值: {:.2}", sar_value);
+//! if let Some(output) = result3 {
+//!     println!("当前 SAR 值: {:.2}, 趋势: {}", output.sar, if output.is_uptrend { "上升" } else { "下降" });
 //! }
 //! ```
 

@@ -31,46 +31,247 @@ Aurora是一个使用Rust构建的模块化、事件驱动的量化交易研究�
 
 ### Cargo Workspace 成员
 
-- **`aurora-core`** (库) - 核心数据结构和trait定义
-  - K线数据结构和市场事件系统
-  - 统一的数据源、策略、投资组合接口抽象
-  - 交易信号和信号事件定义
-  
-- **`aurora-data`** (二进制) - 数据采集工具
-  - 支持Binance历史数据下载（REST API）
-  - 实时WebSocket数据流（K线和逐笔成交）
-  - 自动重连和错误处理机制
-  
-- **`aurora-indicators`** (库) - 技术指标计算库
-  - 20+ 种常用技术指标
-  - 涵盖趋势、动量、波动率、成交量四大类别
-  - 高效的滑动窗口实现，支持流式计算
-  
-- **`aurora-strategy`** (库) - 交易策略实现
-  - 统一的策略接口抽象
-  - MA交叉等经典策略实现
-  - 支持自定义策略扩展
-  
-- **`aurora-portfolio`** (库) - 投资组合管理
-  - 交易执行和权益追踪
-  - 业绩分析和风险指标计算
-  - 完整的交易历史记录
-  
-- **`aurora-backtester`** (二进制) - 历史回测引擎
-  - 基于历史数据的策略验证
-  - 详细的回测报告和统计分析
-  - 严格的时间序列处理，避免未来函数
-  
-- **`aurora-live`** (二进制) - 实时模拟交易引擎
-  - 7x24小时实时数据处理
-  - 模拟交易执行（纸上交易）
-  - 实时账户监控和业绩追踪
+Aurora框架由8个精心设计的crate组成，每个crate都有明确的职责和边界：
 
-- **`aurora-config`** (库) - 配置管理
-  - 统一的TOML配置文件支持
-  - 数据源、策略、投资组合等完整配置
-  - 配置验证和默认值处理
-  - 支持多策略配置
+#### 📦 **`aurora-core`** (库)
+> 核心抽象层 - 提供整个框架的基础数据结构和trait定义
+
+**核心功能**：
+- `Kline`数据结构：标准化的OHLCV市场数据
+- `MarketEvent`事件系统：统一的事件驱动架构
+- `Signal`交易信号：Buy/Sell/Hold枚举定义
+- `SignalEvent`信号事件：包含价格、时间戳等完整上下文
+- `DataSource` trait：异步数据源统一接口
+- `Strategy` trait：策略开发统一接口
+- `Portfolio` trait：投资组合管理统一接口
+
+**依赖关系**：无外部依赖，作为最底层的基础库
+**适用场景**：作为其他所有crate的基础依赖
+
+---
+
+#### 📡 **`aurora-data`** (可执行文件 + 库)
+> 数据采集模块 - 支持历史数据下载和实时数据流接收
+
+**核心功能**：
+- **历史数据下载器**：通过REST API批量获取K线数据
+  - 支持多种时间间隔（1m, 5m, 15m, 1h, 4h, 1d等）
+  - 支持时间范围过滤
+  - 自动数据验证和CSV存储
+- **实时数据流**：通过WebSocket接收实时市场数据
+  - K线数据实时更新
+  - 逐笔成交数据流
+  - 自动重连机制和错误恢复
+- **数据加载器**：从CSV等格式加载历史数据
+
+**支持的数据源**：
+- Binance（完整支持）
+- 可扩展支持其他交易所
+
+**CLI命令**：
+```bash
+# 下载历史数据
+aurora-data download --symbol BTCUSDT --interval 1h --output data.csv
+
+# 实时数据流
+aurora-data stream --symbol BTCUSDT --interval 1m
+```
+
+---
+
+#### 📊 **`aurora-indicators`** (库)
+> 技术指标库 - 提供20+种常用技术分析指标
+
+**核心功能**：
+- **趋势指标**（6种）：
+  - `MA`：简单移动平均线
+  - `EMA`：指数移动平均线
+  - `MACD`：移动平均收敛散度
+  - `ADX`：平均动向指数
+  - `PSAR`：抛物线转向指标
+  - `Ichimoku`：一目均衡表
+  
+- **动量指标**（5种）：
+  - `RSI`：相对强弱指数
+  - `Stochastic`：随机震荡指标
+  - `ROC`：变动率指标
+  - `CCI`：商品通道指数
+  - `Williams %R`：威廉指标
+  
+- **波动率指标**（4种）：
+  - `Bollinger Bands`：布林带
+  - `ATR`：平均真实波幅
+  - `StdDev`：标准差
+  - `Keltner Channels`：肯特纳通道
+  
+- **成交量指标**（5种）：
+  - `OBV`：能量潮
+  - `MFI`：资金流量指数
+  - `VWAP`：成交量加权平均价
+  - `CMF`：佳庆资金流
+  - `ADLine`：累积/派发线
+
+**设计特点**：
+- 滑动窗口算法，内存高效
+- 状态管理，支持流式数据处理
+- 统一的`update()`接口设计
+- 完整的单元测试覆盖
+
+---
+
+#### 🎯 **`aurora-strategy`** (库)
+> 策略开发框架 - 提供统一的策略接口和经典策略实现
+
+**核心功能**：
+- `Strategy` trait定义：标准化的策略开发接口
+- `MACrossoverStrategy`：移动平均线交叉策略
+  - 金叉（短期MA上穿长期MA）产生买入信号
+  - 死叉（短期MA下穿长期MA）产生卖出信号
+  - 支持自定义短期和长期周期
+  - 状态维护，避免重复信号
+
+**扩展开发**：
+```rust
+impl Strategy for MyStrategy {
+    fn on_market_event(&mut self, event: &MarketEvent) -> Option<SignalEvent> {
+        // 实现自定义策略逻辑
+    }
+}
+```
+
+---
+
+#### 💼 **`aurora-portfolio`** (库)
+> 投资组合管理 - 交易执行、风险控制、业绩分析的完整解决方案
+
+**核心功能**：
+- **基础投资组合管理**（`BasePortfolio`）：
+  - 现金和持仓跟踪
+  - 买卖操作执行
+  - 权益曲线记录
+  - 手续费和滑点模拟
+  
+- **风险管理器**（`RiskManager`）：
+  - 最大回撤限制
+  - 连续亏损保护
+  - 最低权益要求
+  - 单次交易风险控制
+  
+- **仓位管理器**（`PositionManager`）：
+  - 固定金额策略
+  - 固定比例策略
+  - Kelly准则
+  - 金字塔加仓策略
+  
+- **业绩分析器**（`PortfolioAnalytics`）：
+  - 总收益率
+  - 年化收益率
+  - 最大回撤
+  - 夏普比率
+  - 胜率统计
+  - 盈亏比
+
+**订单类型支持**：
+- 市价单
+- 限价单
+- 止损单
+- 止盈单
+
+---
+
+#### 🔄 **`aurora-backtester`** (可执行文件 + 库)
+> 历史回测引擎 - 基于历史数据验证策略有效性
+
+**核心功能**：
+- 历史数据回放引擎
+- 策略执行和信号生成
+- 投资组合状态跟踪
+- 详细的业绩报告生成
+
+**回测报告包含**：
+- 总收益率和年化收益率
+- 最大回撤和回撤持续时间
+- 夏普比率和索提诺比率
+- 交易次数和胜率
+- 平均盈利和平均亏损
+- 盈亏比和最大连续盈亏
+
+**CLI命令**：
+```bash
+# 使用命令行参数
+aurora-backtester --data-path btc_1h.csv --short 10 --long 30
+
+# 使用配置文件
+aurora-backtester --config backtest_config.toml
+```
+
+**特性**：
+- 严格避免未来函数
+- 支持手续费和滑点模拟
+- 支持多种风险管理规则
+- 支持多种仓位管理策略
+
+---
+
+#### 🚀 **`aurora-live`** (可执行文件 + 库)
+> 实时模拟交易引擎 - 7x24小时模拟交易系统
+
+**核心功能**：
+- 实时数据接收和处理
+- 策略实时执行
+- 模拟订单执行（纸上交易）
+- 实时权益监控
+- 定期业绩报告
+
+**PaperTrader（模拟交易器）**：
+- 无风险的模拟交易环境
+- 实时价格执行
+- 完整的交易记录
+- 与回测引擎一致的业绩计算
+
+**CLI命令**：
+```bash
+# 使用命令行参数
+aurora-live --symbol BTCUSDT --short 10 --long 30
+
+# 使用配置文件
+aurora-live --config live_config.toml
+```
+
+**监控特性**：
+- 每分钟输出当前状态
+- 自动重连机制
+- 错误日志记录
+- Graceful shutdown支持
+
+---
+
+#### ⚙️ **`aurora-config`** (库)
+> 配置管理 - 统一的TOML配置文件支持
+
+**核心功能**：
+- TOML格式配置文件解析
+- 配置验证和默认值处理
+- 多策略配置支持
+- 类型安全的配置结构
+
+**配置类型**：
+- `DataSourceConfig`：数据源配置（API密钥、URL、超时等）
+- `StrategyConfig`：策略配置（类型、参数、启用状态）
+- `PortfolioConfig`：投资组合配置（初始资金、手续费、滑点）
+- `RiskRulesConfig`：风险规则配置（回撤、止损等）
+- `PositionSizingConfig`：仓位管理配置
+- `LogConfig`：日志配置
+- `BacktestConfig`：回测专用配置
+- `LiveConfig`：实时交易专用配置
+
+**使用示例**：
+```rust
+use aurora_config::Config;
+
+let config = Config::from_file("config.toml")?;
+let initial_cash = config.portfolio.initial_cash;
+```
 
 ### 架构特点
 

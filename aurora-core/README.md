@@ -1,17 +1,18 @@
 # Aurora Core
 
-Aurora 核心库 - 量化交易框架的基础抽象层
+Aurora量化交易框架的核心抽象层
 
 ## 概述
 
-`aurora-core` 是 Aurora 量化交易框架的核心库，提供了系统中所有组件共享的基础数据结构和统一接口。它定义了市场数据、交易信号、数据源和策略的标准抽象，使得回测引擎和实时交易引擎可以透明地切换不同的数据来源和策略实现。
+`aurora-core` 是整个Aurora框架的基石，定义了所有模块共享的核心概念和接口。它不包含具体的实现逻辑，而是专注于提供清晰、统一的抽象，使得各个模块能够解耦并协同工作。
 
 ## 主要功能
 
-- **统一数据结构**: 定义标准的 K线数据格式
+- **统一数据结构**: 定义标准的 K线数据格式（OHLCV）
 - **事件系统**: 提供基于事件驱动的市场数据处理机制
 - **交易信号**: 标准化的买入/卖出/持有信号定义
-- **接口抽象**: 定义数据源和策略的统一接口
+- **接口抽象**: 定义数据源、策略和投资组合的统一接口
+- **交易记录**: 完整的订单和交易数据结构
 
 ## 核心类型
 
@@ -217,12 +218,46 @@ tokio = { version = "1.0", features = ["sync"] }
 - **Signal**: 可以扩展支持更复杂的信号类型，如部分买卖、止损止盈等
 - **接口**: DataSource 和 Strategy 接口可以支持更多实现
 
+## 依赖关系图
+
+```
+aurora-core (无外部依赖)
+    ├── aurora-data       (实现 DataSource trait)
+    ├── aurora-indicators  (提供技术指标计算)
+    ├── aurora-strategy   (实现 Strategy trait)
+    ├── aurora-portfolio  (实现 Portfolio trait)
+    ├── aurora-backtester (使用所有核心接口)
+    ├── aurora-live       (使用所有核心接口)
+    └── aurora-config     (配置管理)
+```
+
+所有其他crate都依赖`aurora-core`，确保整个框架的一致性。
+
 ## 相关 Crate
 
-- **aurora-data**: 实现了 `DataSource` 接口，提供历史数据和实时数据源
-- **aurora-strategy**: 实现了 `Strategy` 接口，提供各种交易策略
-- **aurora-backtester**: 使用核心接口实现回测引擎
-- **aurora-live**: 使用核心接口实现实时交易引擎
+- **[aurora-data](../aurora-data)**: 实现 `DataSource` 接口，提供历史数据和实时数据源
+- **[aurora-indicators](../aurora-indicators)**: 提供20+种技术分析指标
+- **[aurora-strategy](../aurora-strategy)**: 实现 `Strategy` 接口，提供各种交易策略
+- **[aurora-portfolio](../aurora-portfolio)**: 实现 `Portfolio` 接口，提供投资组合管理
+- **[aurora-backtester](../aurora-backtester)**: 使用核心接口实现回测引擎
+- **[aurora-live](../aurora-live)**: 使用核心接口实现实时交易引擎
+- **[aurora-config](../aurora-config)**: 统一的配置管理
+
+## API文档
+
+生成完整的API文档：
+
+```bash
+cargo doc -p aurora-core --open
+```
+
+## 测试
+
+运行核心库测试：
+
+```bash
+cargo test -p aurora-core
+```
 
 ## 版本
 
@@ -230,4 +265,4 @@ tokio = { version = "1.0", features = ["sync"] }
 
 ## 许可证
 
-本项目的许可证信息请参考根目录的 LICENSE 文件。
+Apache License 2.0 - 详见根目录 LICENSE 文件

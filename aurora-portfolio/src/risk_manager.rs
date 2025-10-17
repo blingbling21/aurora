@@ -17,7 +17,6 @@
 //! 提供投资组合级别的风险控制功能,包括最大回撤限制、
 //! 连续亏损限制等,用于保护账户资金安全。
 
-use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 

@@ -10,9 +10,18 @@ Aurora 回测引擎 - 基于历史数据验证和优化交易策略
 
 ### 📈 策略回测
 - 支持多种交易策略（MA交叉、RSI、布林带等）
-- 事件驱动的回测架构
+- **事件驱动回测引擎** - 逐事件处理，精确模拟真实交易
+- **向量化回测引擎** - 高性能批量处理，适合参数优化
 - 精确的信号触发和订单执行
 - 支持做多策略（未来可扩展做空、对冲等）
+
+### 💰 真实性增强
+- **买卖价差模式 (Bid-Ask Spread)** - 更真实的交易价格模拟
+  - 买入使用卖一价（Ask Price）
+  - 卖出使用买一价（Bid Price）
+  - 可配置价差百分比
+- **收盘价模式** - 传统简化回测模式
+- 手续费和滑点考虑
 
 ### 💼 仓位管理
 - 自动管理现金和持仓
@@ -23,9 +32,16 @@ Aurora 回测引擎 - 基于历史数据验证和优化交易策略
 ### 📊 绩效分析
 - 总收益率和年化收益率
 - 最大回撤分析
-- 夏普比率计算
+- 夏普比率、索提诺比率、卡玛比率
 - 交易次数和胜率统计
 - 详细的回测报告
+
+### 📈 可视化报告
+- **权益曲线图** - 显示资金变化趋势
+- **回撤曲线图** - 可视化风险暴露
+- **交易点位图** - 标记买卖信号在价格图上
+- **HTML 完整报告** - 精美的交互式报告
+- 性能指标仪表板
 
 ### 🎯 命令行工具
 - 简单易用的 CLI 界面
@@ -259,6 +275,175 @@ async fn main() -> anyhow::Result<()> {
     
     Ok(())
 }
+```
+
+## 新功能详解
+
+### 🎯 买卖价差模式 (Bid-Ask Spread)
+
+更真实的回测模式，模拟实际交易中的买卖价差：
+
+```rust
+use aurora_backtester::{BacktestEngine, PricingMode};
+use aurora_strategy::MACrossoverStrategy;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let klines = load_klines("btc_1h.csv")?;
+    let strategy = MACrossoverStrategy::new(10, 30);
+    
+    // 使用 0.1% 的买卖价差
+    let pricing_mode = PricingMode::BidAsk { spread_pct: 0.001 };
+    
+    let mut engine = BacktestEngine::with_pricing_mode(
+        strategy,
+        10000.0,
+        pricing_mode
+    );
+    
+    engine.run(&klines).await?;
+    
+    Ok(())
+}
+```
+
+**定价模式对比**:
+
+- **Close 模式**: 买入和卖出都使用收盘价（简化模式）
+- **BidAsk 模式**: 买入使用 Ask价格，卖出使用 Bid价格（真实模式）
+
+```rust
+// 收盘价模式
+let close_mode = PricingMode::Close;
+
+// 买卖价差模式（0.1% 价差）
+let bid_ask_mode = PricingMode::BidAsk { spread_pct: 0.001 };
+```
+
+### 📊 可视化报告生成
+
+生成专业的图表和 HTML 报告：
+
+```rust
+use aurora_backtester::{BacktestVisualizer, BacktestData};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // ... 运行回测 ...
+    
+    // 准备可视化数据
+    let data = BacktestData {
+        equity_curve: vec![(timestamp1, equity1), (timestamp2, equity2), ...],
+        drawdown_curve: vec![(timestamp1, drawdown1), ...],
+        price_data: vec![(timestamp1, price1), ...],
+        buy_trades: vec![(timestamp1, buy_price1), ...],
+        sell_trades: vec![(timestamp1, sell_price1), ...],
+        metrics: performance_metrics,
+        initial_cash: 10000.0,
+    };
+    
+    // 创建可视化器
+    let visualizer = BacktestVisualizer::new();
+    
+    // 生成单独的图表
+    visualizer.plot_equity_curve(&data, "output/equity.png")?;
+    visualizer.plot_drawdown(&data, "output/drawdown.png")?;
+    visualizer.plot_trades(&data, "output/trades.png")?;
+    
+    // 生成完整 HTML 报告
+    visualizer.generate_html_report(&data, "output/report.html")?;
+    
+    Ok(())
+}
+```
+
+**生成的图表包括**:
+- 📈 **权益曲线**: 显示资金随时间的变化
+- 📉 **回撤曲线**: 可视化最大回撤和风险
+- 🎯 **交易点位图**: 在价格图上标记买卖点
+
+**HTML 报告特点**:
+- 响应式设计，支持打印
+- 精美的性能指标仪表板
+- 交互式图表展示
+- 完整的交易统计信息
+
+### ⚡ 向量化回测引擎
+
+高性能批量回测，适合参数优化：
+
+```rust
+use aurora_backtester::VectorizedBacktestEngine;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let klines = load_klines("btc_1h.csv")?;
+    
+    // 创建向量化引擎
+    let engine = VectorizedBacktestEngine::new(10000.0);
+    
+    // 计算均线交叉信号
+    let signals = engine.calculate_ma_crossover_signals(&klines, 10, 30);
+    
+    // 运行回测（非常快！）
+    let result = engine.run(&klines, &signals)?;
+    
+    result.print_summary();
+    
+    Ok(())
+}
+```
+
+**参数网格搜索**:
+
+```rust
+use aurora_backtester::VectorizedBacktestEngine;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let klines = load_klines("btc_1h.csv")?;
+    let engine = VectorizedBacktestEngine::new(10000.0);
+    
+    let mut best_return = 0.0;
+    let mut best_params = (0, 0);
+    
+    // 快速测试大量参数组合
+    for short in (5..=20).step_by(1) {
+        for long in (20..=100).step_by(5) {
+            if short >= long { continue; }
+            
+            let signals = engine.calculate_ma_crossover_signals(&klines, short, long);
+            let result = engine.run(&klines, &signals)?;
+            
+            if result.total_return > best_return {
+                best_return = result.total_return;
+                best_params = (short, long);
+            }
+        }
+    }
+    
+    println!("最佳参数: {:?}, 收益: {:.2}%", best_params, best_return * 100.0);
+    
+    Ok(())
+}
+```
+
+**性能对比**:
+- **事件驱动引擎**: 精确模拟，适合最终验证
+- **向量化引擎**: 快100-1000倍，适合参数筛选
+
+**使用场景**:
+- ✅ 均线策略参数优化
+- ✅ 技术指标阈值搜索
+- ✅ 快速策略筛选
+- ❌ 复杂仓位管理策略
+- ❌ 需要精确订单模拟
+
+### 🔧 自定义图表尺寸
+
+```rust
+let visualizer = BacktestVisualizer::with_size(1920, 1080);
+visualizer.generate_html_report(&data, "report_hd.html")?;
 ```
 
 ## 命令行接口

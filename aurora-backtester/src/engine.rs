@@ -1,3 +1,17 @@
+// Copyright 2025 blingbling21
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use anyhow::{Result, anyhow};
 use aurora_config::PortfolioConfig;
 use aurora_core::{Kline, MarketEvent, Signal, Strategy};
@@ -5,6 +19,9 @@ use aurora_portfolio::{BasePortfolio, Portfolio};
 use aurora_strategy::MACrossoverStrategy;
 use std::path::Path;
 use tracing::{debug, error, info};
+
+// 始终使用相对路径，main.rs 将会声明这个模块
+use crate::pricing_mode::PricingMode;
 
 /// 运行回测
 pub async fn run_backtest(
@@ -70,6 +87,7 @@ fn load_klines_from_csv(file_path: &str) -> Result<Vec<Kline>> {
 pub struct BacktestEngine {
     strategy: MACrossoverStrategy,
     portfolio: BasePortfolio,
+    pricing_mode: PricingMode,
 }
 
 impl BacktestEngine {
@@ -80,6 +98,21 @@ impl BacktestEngine {
     /// * `strategy` - 交易策略
     /// * `portfolio_config` - 投资组合配置（包含风险管理和仓位管理规则）
     pub fn new(strategy: MACrossoverStrategy, portfolio_config: &PortfolioConfig) -> Result<Self> {
+        Self::with_pricing_mode(strategy, portfolio_config, PricingMode::default())
+    }
+
+    /// 使用指定的定价模式创建回测引擎
+    ///
+    /// # 参数
+    ///
+    /// * `strategy` - 交易策略
+    /// * `portfolio_config` - 投资组合配置
+    /// * `pricing_mode` - 定价模式（控制买卖价格计算方式）
+    pub fn with_pricing_mode(
+        strategy: MACrossoverStrategy,
+        portfolio_config: &PortfolioConfig,
+        pricing_mode: PricingMode,
+    ) -> Result<Self> {
         let mut portfolio = BasePortfolio::new(portfolio_config.initial_cash);
         
         // 配置风险管理器（如果提供）
@@ -97,10 +130,13 @@ impl BacktestEngine {
             portfolio = portfolio.with_position_manager(position_manager);
             info!("已启用仓位管理");
         }
+
+        info!("定价模式: {:?}", pricing_mode);
         
         Ok(Self {
             strategy,
             portfolio,
+            pricing_mode,
         })
     }
 
@@ -121,26 +157,31 @@ impl BacktestEngine {
 
             // 让策略处理事件
             if let Some(signal_event) = self.strategy.on_market_event(&market_event) {
-                debug!(
-                    "收到交易信号: {:?} at price {:.2}",
-                    signal_event.signal, signal_event.price
-                );
-
-                // 执行交易信号
+                // 执行交易信号，使用定价模式确定实际交易价格
                 match signal_event.signal {
                     Signal::Buy => {
+                        let buy_price = self.pricing_mode.get_buy_price(kline);
+                        debug!(
+                            "收到买入信号，信号价格: {:.2}, 实际买入价格: {:.2}",
+                            signal_event.price, buy_price
+                        );
                         if let Err(e) = self
                             .portfolio
-                            .execute_buy(signal_event.price, signal_event.timestamp)
+                            .execute_buy(buy_price, signal_event.timestamp)
                             .await
                         {
                             debug!("买入失败: {}", e);
                         }
                     }
                     Signal::Sell => {
+                        let sell_price = self.pricing_mode.get_sell_price(kline);
+                        debug!(
+                            "收到卖出信号，信号价格: {:.2}, 实际卖出价格: {:.2}",
+                            signal_event.price, sell_price
+                        );
                         if let Err(e) = self
                             .portfolio
-                            .execute_sell(signal_event.price, signal_event.timestamp)
+                            .execute_sell(sell_price, signal_event.timestamp)
                             .await
                         {
                             debug!("卖出失败: {}", e);
@@ -152,8 +193,9 @@ impl BacktestEngine {
                 }
             }
 
-            // 更新权益曲线
-            self.portfolio.update_equity(kline.timestamp, kline.close);
+            // 更新权益曲线，使用标记价格（中间价）
+            let mark_price = self.pricing_mode.get_mark_price(kline);
+            self.portfolio.update_equity(kline.timestamp, mark_price);
 
             processed_count += 1;
 

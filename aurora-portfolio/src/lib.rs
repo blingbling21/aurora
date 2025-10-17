@@ -10,6 +10,9 @@
 //! - **风险控制**: 最大回撤、止损止盈、连续亏损限制等多层风险管理
 //! - **仓位管理**: 固定金额、固定比例、Kelly准则、金字塔加仓等多种策略
 //! - **业绩分析**: 收益率、夏普比率等业绩指标计算
+//! - **经纪商抽象**: 统一的交易接口,支持模拟和实盘交易
+//! - **订单簿模拟**: 完整的订单簿和撮合引擎实现
+//! - **交易成本**: 支持多种手续费和滑点模型
 //!
 //! # 使用示例
 //!
@@ -76,6 +79,37 @@
 //! # Ok::<(), anyhow::Error>(())
 //! ```
 
+//! ## 经纪商和订单管理
+//!
+//! ```rust
+//! use aurora_portfolio::{PaperBroker, Broker, Order, OrderType, OrderSide};
+//! use aurora_portfolio::{FeeModel, SlippageModel};
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // 创建模拟经纪商
+//!     let mut broker = PaperBroker::new()
+//!         .with_balance("USDT", 10000.0)
+//!         .with_fee_model(FeeModel::Percentage(0.1))
+//!         .with_slippage_model(SlippageModel::Percentage(0.05));
+//!     
+//!     // 设置市场价格
+//!     broker.update_market_price("BTC/USDT", 50000.0, 1640995200000).await?;
+//!     
+//!     // 提交限价买单
+//!     let order = Order::new(
+//!         OrderType::Limit(49000.0),
+//!         OrderSide::Buy,
+//!         0.1,
+//!         1640995200000,
+//!     );
+//!     let order_id = broker.submit_order("BTC/USDT", order).await?;
+//!     println!("订单ID: {}", order_id);
+//!     
+//!     Ok(())
+//! }
+//! ```
+
 // Copyright 2025 blingbling21
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -91,14 +125,22 @@
 // limitations under the License.
 
 mod analytics;
+mod broker;
+mod fees;
 mod order;
+mod order_book;
+mod paper_broker;
 mod portfolio;
 mod position_manager;
 mod risk_manager;
 mod trade;
 
 pub use analytics::{EquityPoint, PerformanceMetrics, PortfolioAnalytics};
+pub use broker::Broker;
+pub use fees::{FeeModel, SlippageModel, TradeCost, TradeCostCalculator};
 pub use order::{Order, OrderSide, OrderStatus, OrderType};
+pub use order_book::{MatchingEngine, OrderBook};
+pub use paper_broker::PaperBroker;
 pub use portfolio::{BasePortfolio, Portfolio};
 pub use position_manager::{PositionManager, PositionSizingStrategy};
 pub use risk_manager::{RiskCheckResult, RiskManager, RiskRules};
