@@ -120,6 +120,7 @@ mod tests {
             interval: Some("1h".to_string()),
             start_time: Some("2024-01-01".to_string()),
             end_time: Some("2024-12-31".to_string()),
+            pricing_mode: None,
         };
 
         assert_eq!(config.data_path, "data.csv");

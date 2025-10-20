@@ -30,6 +30,7 @@ pub async fn run_backtest(
     short_period: usize,
     long_period: usize,
     portfolio_config: &PortfolioConfig,
+    pricing_mode_config: Option<&aurora_config::PricingModeConfig>,
 ) -> Result<()> {
     // 验证数据文件是否存在
     if !Path::new(data_path).exists() {
@@ -50,13 +51,16 @@ pub async fn run_backtest(
         _ => return Err(anyhow!("不支持的策略: {}", strategy_name)),
     };
 
+    // 从配置创建定价模式
+    let pricing_mode = PricingMode::from_config(pricing_mode_config);
+
     info!(
-        "初始化回测引擎，策略: {}, 参数: {}:{}, 初始资金: {:.2}",
-        strategy_name, short_period, long_period, portfolio_config.initial_cash
+        "初始化回测引擎，策略: {}, 参数: {}:{}, 初始资金: {:.2}, 定价模式: {:?}",
+        strategy_name, short_period, long_period, portfolio_config.initial_cash, pricing_mode
     );
 
     // 创建回测引擎并运行
-    let mut engine = BacktestEngine::new(strategy, portfolio_config)?;
+    let mut engine = BacktestEngine::with_pricing_mode(strategy, portfolio_config, pricing_mode)?;
     engine.run(&klines).await?;
 
     Ok(())
@@ -88,6 +92,8 @@ pub struct BacktestEngine {
     strategy: MACrossoverStrategy,
     portfolio: BasePortfolio,
     pricing_mode: PricingMode,
+    stop_loss_pct: Option<f64>,
+    take_profit_pct: Option<f64>,
 }
 
 impl BacktestEngine {
@@ -115,12 +121,30 @@ impl BacktestEngine {
     ) -> Result<Self> {
         let mut portfolio = BasePortfolio::new(portfolio_config.initial_cash);
         
+        // 提取止损止盈百分比（如果配置了的话）
+        let stop_loss_pct = portfolio_config
+            .risk_rules
+            .as_ref()
+            .and_then(|r| r.stop_loss_pct);
+        let take_profit_pct = portfolio_config
+            .risk_rules
+            .as_ref()
+            .and_then(|r| r.take_profit_pct);
+        
         // 配置风险管理器（如果提供）
         if let Some(ref risk_rules_config) = portfolio_config.risk_rules {
             let risk_rules = risk_rules_config.to_risk_rules();
             let risk_manager = aurora_portfolio::RiskManager::new(risk_rules, portfolio_config.initial_cash);
             portfolio = portfolio.with_risk_manager(risk_manager);
             info!("已启用风险管理");
+            
+            if stop_loss_pct.is_some() || take_profit_pct.is_some() {
+                info!(
+                    "已配置动态止损止盈: 止损={}%, 止盈={}%",
+                    stop_loss_pct.map(|v| v.to_string()).unwrap_or("未设置".to_string()),
+                    take_profit_pct.map(|v| v.to_string()).unwrap_or("未设置".to_string())
+                );
+            }
         }
         
         // 配置仓位管理器（如果提供）
@@ -137,6 +161,8 @@ impl BacktestEngine {
             strategy,
             portfolio,
             pricing_mode,
+            stop_loss_pct,
+            take_profit_pct,
         })
     }
 
@@ -165,12 +191,51 @@ impl BacktestEngine {
                             "收到买入信号，信号价格: {:.2}, 实际买入价格: {:.2}",
                             signal_event.price, buy_price
                         );
-                        if let Err(e) = self
+                        match self
                             .portfolio
                             .execute_buy(buy_price, signal_event.timestamp)
                             .await
                         {
-                            debug!("买入失败: {}", e);
+                            Ok(_trade) => {
+                                // 买入成功后，如果配置了止损止盈百分比，则设置止损止盈价格
+                                if self.stop_loss_pct.is_some() || self.take_profit_pct.is_some() {
+                                    if let Some(risk_manager) = self.portfolio.get_risk_manager_mut() {
+                                        let stop_loss = self.stop_loss_pct.unwrap_or(0.0);
+                                        let take_profit = self.take_profit_pct.unwrap_or(0.0);
+                                        
+                                        if stop_loss > 0.0 && take_profit > 0.0 {
+                                            risk_manager.set_stop_loss_take_profit(buy_price, stop_loss, take_profit);
+                                            debug!(
+                                                "已设置止损止盈: 入场价={:.2}, 止损={}%, 止盈={}%",
+                                                buy_price, stop_loss, take_profit
+                                            );
+                                        } else if stop_loss > 0.0 {
+                                            let stop_price = risk_manager.calculate_stop_loss(buy_price, stop_loss);
+                                            risk_manager.update_rules(
+                                                risk_manager.get_rules().clone()
+                                                    .with_stop_loss_price(stop_price)
+                                            );
+                                            debug!(
+                                                "已设置止损: 入场价={:.2}, 止损价={:.2} ({}%)",
+                                                buy_price, stop_price, stop_loss
+                                            );
+                                        } else if take_profit > 0.0 {
+                                            let take_price = risk_manager.calculate_take_profit(buy_price, take_profit);
+                                            risk_manager.update_rules(
+                                                risk_manager.get_rules().clone()
+                                                    .with_take_profit_price(take_price)
+                                            );
+                                            debug!(
+                                                "已设置止盈: 入场价={:.2}, 止盈价={:.2} ({}%)",
+                                                buy_price, take_price, take_profit
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                debug!("买入失败: {}", e);
+                            }
                         }
                     }
                     Signal::Sell => {
@@ -179,12 +244,21 @@ impl BacktestEngine {
                             "收到卖出信号，信号价格: {:.2}, 实际卖出价格: {:.2}",
                             signal_event.price, sell_price
                         );
-                        if let Err(e) = self
+                        match self
                             .portfolio
                             .execute_sell(sell_price, signal_event.timestamp)
                             .await
                         {
-                            debug!("卖出失败: {}", e);
+                            Ok(_trade) => {
+                                // 卖出成功后，清除止损止盈设置
+                                if let Some(risk_manager) = self.portfolio.get_risk_manager_mut() {
+                                    risk_manager.clear_stop_loss_take_profit();
+                                    debug!("已清除止损止盈设置");
+                                }
+                            }
+                            Err(e) => {
+                                debug!("卖出失败: {}", e);
+                            }
                         }
                     }
                     Signal::Hold => {

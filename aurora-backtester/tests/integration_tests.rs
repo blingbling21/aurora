@@ -79,7 +79,7 @@ async fn test_complete_backtest_flow() -> Result<()> {
 
     // 运行回测
     let portfolio_config = create_test_portfolio_config(10000.0);
-    let result = run_backtest(&csv_file, "ma-crossover", 2, 3, &portfolio_config).await;
+    let result = run_backtest(&csv_file, "ma-crossover", 2, 3, &portfolio_config, None).await;
     assert!(result.is_ok());
 
     Ok(())
@@ -135,12 +135,12 @@ async fn test_csv_loading_errors() {
     let portfolio_config = create_test_portfolio_config(10000.0);
     
     // 测试不存在的文件
-    let result = run_backtest("nonexistent_file.csv", "ma-crossover", 5, 20, &portfolio_config).await;
+    let result = run_backtest("nonexistent_file.csv", "ma-crossover", 5, 20, &portfolio_config, None).await;
     assert!(result.is_err());
 
     // 测试无效的策略名称
     let (csv_file, _temp_dir) = create_test_csv_file().unwrap();
-    let result = run_backtest(&csv_file, "invalid-strategy", 5, 20, &portfolio_config).await;
+    let result = run_backtest(&csv_file, "invalid-strategy", 5, 20, &portfolio_config, None).await;
     assert!(result.is_err());
 }
 
@@ -154,7 +154,7 @@ async fn test_empty_data_file() -> Result<()> {
     writeln!(file, "timestamp,open,high,low,close,volume")?; // 只有头部
 
     let portfolio_config = create_test_portfolio_config(10000.0);
-    let result = run_backtest(&file_path.to_string_lossy(), "ma-crossover", 5, 20, &portfolio_config).await;
+    let result = run_backtest(&file_path.to_string_lossy(), "ma-crossover", 5, 20, &portfolio_config, None).await;
 
     assert!(result.is_err());
 
@@ -174,7 +174,7 @@ async fn test_invalid_csv_data() -> Result<()> {
     writeln!(file, "1640995200000,50000.0,50500.0,49500.0,50000.0,100.0")?; // 一行有效数据
 
     let portfolio_config = create_test_portfolio_config(10000.0);
-    let result = run_backtest(&file_path.to_string_lossy(), "ma-crossover", 2, 3, &portfolio_config).await;
+    let result = run_backtest(&file_path.to_string_lossy(), "ma-crossover", 2, 3, &portfolio_config, None).await;
 
     // 应该能处理部分无效数据，只要有一些有效数据
     assert!(result.is_ok());
@@ -191,7 +191,7 @@ async fn test_different_strategy_parameters() -> Result<()> {
     let test_cases = vec![(5, 10), (10, 20), (2, 5)];
 
     for (short, long) in test_cases {
-        let result = run_backtest(&csv_file, "ma-crossover", short, long, &portfolio_config).await;
+        let result = run_backtest(&csv_file, "ma-crossover", short, long, &portfolio_config, None).await;
         assert!(result.is_ok(), "策略参数 {}:{} 回测失败", short, long);
     }
 
@@ -207,7 +207,7 @@ async fn test_different_initial_cash() -> Result<()> {
 
     for cash in cash_amounts {
         let portfolio_config = create_test_portfolio_config(cash);
-        let result = run_backtest(&csv_file, "ma-crossover", 5, 10, &portfolio_config).await;
+        let result = run_backtest(&csv_file, "ma-crossover", 5, 10, &portfolio_config, None).await;
         assert!(result.is_ok(), "初始资金 {} 回测失败", cash);
     }
 
@@ -255,6 +255,7 @@ async fn test_large_dataset_performance() -> Result<()> {
         10,
         30,
         &portfolio_config,
+        None,
     )
     .await;
 
@@ -407,6 +408,7 @@ async fn test_concurrent_backtests() -> Result<()> {
                 5,
                 10,
                 &portfolio_config,
+                None,
             )
             .await
         });

@@ -183,10 +183,18 @@ impl Strategy for MyStrategy {
 > 历史回测引擎 - 基于历史数据验证策略有效性
 
 **核心功能**：
-- 历史数据回放引擎
-- 策略执行和信号生成
-- 投资组合状态跟踪
-- 详细的业绩报告生成
+- **事件驱动回测引擎**：逐事件处理，精确模拟真实交易
+- **定价模式支持**：
+  - Close 模式：使用收盘价（简化模式）
+  - BidAsk 模式：模拟买卖价差（真实模式）
+  - 可通过配置文件灵活切换
+- **动态止损止盈**：
+  - 基于入场价格的百分比止损止盈
+  - 买入时自动设置，卖出时自动清除
+  - 止损价 = 入场价 × (1 - stop_loss_pct/100)
+  - 止盈价 = 入场价 × (1 + take_profit_pct/100)
+- **投资组合状态跟踪**：实时权益曲线和持仓管理
+- **详细的业绩报告生成**：多维度绩效指标分析
 
 **回测报告包含**：
 - 总收益率和年化收益率
@@ -195,14 +203,16 @@ impl Strategy for MyStrategy {
 - 交易次数和胜率
 - 平均盈利和平均亏损
 - 盈亏比和最大连续盈亏
+- 止损止盈配置信息
+- 定价模式信息
 
 **CLI命令**：
 ```bash
+# 使用配置文件（推荐）
+aurora-backtester --config backtest_config.toml
+
 # 使用命令行参数
 aurora-backtester --data-path btc_1h.csv --short 10 --long 30
-
-# 使用配置文件
-aurora-backtester --config backtest_config.toml
 ```
 
 **特性**：
@@ -210,6 +220,8 @@ aurora-backtester --config backtest_config.toml
 - 支持手续费和滑点模拟
 - 支持多种风险管理规则
 - 支持多种仓位管理策略
+- 支持定价模式配置
+- 支持动态止损止盈
 
 ---
 
@@ -259,11 +271,12 @@ aurora-live --config live_config.toml
 - `DataSourceConfig`：数据源配置（API密钥、URL、超时等）
 - `StrategyConfig`：策略配置（类型、参数、启用状态）
 - `PortfolioConfig`：投资组合配置（初始资金、手续费、滑点）
-- `RiskRulesConfig`：风险规则配置（回撤、止损等）
-- `PositionSizingConfig`：仓位管理配置
+- `RiskRulesConfig`：风险规则配置（回撤、止损止盈等）
+- `PositionSizingConfig`：仓位管理配置（固定金额、固定比例、Kelly、金字塔等）
 - `LogConfig`：日志配置
-- `BacktestConfig`：回测专用配置
+- `BacktestConfig`：回测专用配置（数据路径、定价模式等）
 - `LiveConfig`：实时交易专用配置
+- `PricingModeConfig`：定价模式配置（Close/BidAsk）
 
 **使用示例**：
 ```rust
@@ -272,6 +285,11 @@ use aurora_config::Config;
 let config = Config::from_file("config.toml")?;
 let initial_cash = config.portfolio.initial_cash;
 ```
+
+**新增功能**：
+- ✅ 定价模式配置（Close/BidAsk）
+- ✅ 动态止损止盈配置（stop_loss_pct/take_profit_pct）
+- ✅ 灵活的仓位管理策略配置
 
 ### 架构特点
 
@@ -319,11 +337,14 @@ cargo run -p aurora-data -- stream --symbol BTCUSDT --stream-type trade
 
 #### 2. 历史回测 (aurora-backtester)
 ```bash
-# 方式1: 使用命令行参数 (传统方式)
-cargo run -p aurora-backtester -- --data-path btc_1h.csv --short 10 --long 30 --initial-cash 10000
-
-# 方式2: 使用配置文件 (推荐)
+# 方式1: 使用配置文件 (推荐)
 cargo run -p aurora-backtester -- --config examples/backtest_config.toml
+
+# 使用 BidAsk 定价模式
+cargo run -p aurora-backtester -- --config examples/backtest_bidask_config.toml
+
+# 方式2: 使用命令行参数 (传统方式)
+cargo run -p aurora-backtester -- --data-path btc_1h.csv --short 10 --long 30 --initial-cash 10000
 
 # 查看详细回测报告
 cargo run -p aurora-backtester -- --data-path btc_1h.csv --short 5 --long 20 --initial-cash 50000
@@ -391,9 +412,11 @@ aurora-live --config my_strategy.toml
 ```
 
 更多配置示例请参考 `examples/` 目录:
-- `backtest_config.toml` - 回测配置示例
+- `backtest_config.toml` - 回测配置示例（包含定价模式和止损止盈配置）
+- `backtest_bidask_config.toml` - BidAsk 定价模式回测示例
 - `live_config.toml` - 实时交易配置示例
 - `complete_config.toml` - 完整配置选项参考
+- `strict_risk_config.toml` - 严格风控配置示例
 
 ## 核心概念
 
@@ -482,9 +505,12 @@ aurora-live --config my_strategy.toml
 
 ## 项目统计
 
-- **模块数量**: 7个crate (4个库 + 3个二进制)
+- **模块数量**: 8个crate (5个库 + 3个二进制)
 - **代码行数**: 15,000+ 行Rust代码
-- **测试覆盖**: 390+ 测试用例
+- **测试覆盖**: 615+ 测试用例（全部通过）
+  - 单元测试：539+
+  - 集成测试：69+
+  - 文档测试：7+
 - **技术指标**: 20+ 种技术分析指标
 - **文档完整性**: 所有公共API都有详细文档和示例
 - **依赖管理**: 统一的workspace依赖版本管理
@@ -517,6 +543,13 @@ aurora-live --config my_strategy.toml
   - `aurora-live`: 7x24小时实时引擎
   - 模拟交易执行和状态监控
   - 错误处理和自动恢复机制
+
+**最新更新 (2025年10月20日)**:
+- ✅ 完成定价模式配置功能（Close/BidAsk）
+- ✅ 实现动态止损止盈功能（基于入场价百分比）
+- ✅ 增强配置文件系统，支持更灵活的参数配置
+- ✅ 所有测试通过（615+ 测试用例）
+- ✅ 更新完整文档和配置示例
 
 ## 生产使用指南
 

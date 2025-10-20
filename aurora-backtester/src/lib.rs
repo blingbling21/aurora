@@ -76,7 +76,7 @@ mod tests {
             rt.block_on(async {
                 // 使用不存在的文件来快速失败，验证函数可以被调用
                 let portfolio_config = create_test_portfolio_config(10000.0);
-                let _ = run_backtest("nonexistent.csv", "ma-crossover", 5, 10, &portfolio_config).await;
+                let _ = run_backtest("nonexistent.csv", "ma-crossover", 5, 10, &portfolio_config, None).await;
             });
         });
 

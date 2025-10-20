@@ -48,11 +48,12 @@ Aurora 配置管理库 - 为量化交易框架提供统一的 TOML 配置文件�
 - **回测配置** (`BacktestConfig`)
   - 数据文件路径
   - 交易对和时间周期
-  - 时间范围
+  - 时间范围过滤（可选）
+  - 定价模式配置（收盘价或买卖价差）
   
 - **实时交易配置** (`LiveConfig`)
   - 交易对和时间周期
-  - 监控间隔
+  - 是否为模拟交易
 
 ### 🔧 功能特性
 
@@ -64,6 +65,9 @@ Aurora 配置管理库 - 为量化交易框架提供统一的 TOML 配置文件�
 - ✅ 可选和必选参数
 - ✅ 多策略支持
 - ✅ 环境特定配置（开发/生产）
+- ✅ 定价模式配置（收盘价/买卖价差）
+- ✅ 动态止损止盈配置
+- ✅ 灵活的仓位管理策略
 
 ## 快速开始
 
@@ -134,6 +138,11 @@ format = "pretty"
 data_path = "btc_1h.csv"
 symbol = "BTCUSDT"
 interval = "1h"
+
+# 定价模式配置
+[backtest.pricing_mode]
+mode = "close"          # 或 "bid_ask"
+# spread_pct = 0.001    # 仅在 bid_ask 模式下需要
 ```
 
 #### 完整配置示例
@@ -248,32 +257,52 @@ pub struct PortfolioConfig {
 
 ```rust
 pub struct RiskRulesConfig {
-    pub max_drawdown: Option<f64>,           // 最大回撤(%)
-    pub max_daily_loss: Option<f64>,         // 单日最大亏损(%)
-    pub max_consecutive_losses: Option<usize>, // 最大连续亏损次数
-    pub min_equity: Option<f64>,             // 最低权益
+    pub max_drawdown_pct: Option<f64>,           // 最大回撤(%)
+    pub max_daily_loss_pct: Option<f64>,         // 单日最大亏损(%)
+    pub max_consecutive_losses: Option<usize>,   // 最大连续亏损次数
+    pub max_single_trade_loss_pct: Option<f64>,  // 单笔最大亏损(%)
+    pub min_equity: Option<f64>,                 // 最低权益
+    pub stop_loss_pct: Option<f64>,              // 止损百分比(相对入场价)
+    pub take_profit_pct: Option<f64>,            // 止盈百分比(相对入场价)
 }
 ```
+
+**动态止损止盈说明**：
+- `stop_loss_pct`: 相对于入场价格的止损百分比，触发价格 = 入场价 × (1 - stop_loss_pct/100)
+- `take_profit_pct`: 相对于入场价格的止盈百分比，触发价格 = 入场价 × (1 + take_profit_pct/100)
+- 止损止盈在买入时自动设置，卖出时自动清除
+- 基于每次交易的实际入场价格动态计算
 
 ### PositionSizingConfig
 
 ```rust
 pub enum PositionSizingConfig {
+    // 全仓策略
+    AllIn,
+    
+    // 固定金额策略
     FixedAmount {
         amount: f64,
     },
+    
+    // 固定比例策略
     FixedPercentage {
-        percentage: f64,
+        percentage: f64,  // 0.0-1.0
     },
+    
+    // Kelly准则策略
     KellyCriterion {
         win_rate: f64,
         profit_loss_ratio: f64,
         kelly_fraction: f64,
     },
+    
+    // 金字塔加仓策略
     Pyramid {
-        initial_amount: f64,
+        initial_percentage: f64,
+        profit_threshold: f64,
+        max_percentage: f64,
         increment: f64,
-        max_levels: usize,
     },
 }
 ```
@@ -304,11 +333,33 @@ match Config::from_file("config.toml") {
 }
 ```
 
+### PricingModeConfig
+
+```rust
+pub enum PricingModeConfig {
+    // 使用收盘价执行交易(简单模式)
+    Close,
+    
+    // 使用买一卖一价执行交易(更真实的模式)
+    BidAsk {
+        spread_pct: f64,  // 买卖价差百分比
+    },
+}
+```
+
+**定价模式说明**：
+- **Close 模式**: 买入和卖出都使用 K 线的收盘价，适合快速回测
+- **BidAsk 模式**: 买入使用卖一价，卖出使用买一价，更接近真实交易
+  - Ask Price = Close × (1 + spread_pct/2)
+  - Bid Price = Close × (1 - spread_pct/2)
+  - 建议 spread_pct 设置为 0.001（0.1%价差）
+
 ## 配置示例文件
 
 项目提供了多个配置示例文件：
 
-- `examples/backtest_config.toml` - 回测配置示例
+- `examples/backtest_config.toml` - 回测配置示例（包含定价模式、止损止盈等完整配置）
+- `examples/backtest_bidask_config.toml` - BidAsk 定价模式回测示例
 - `examples/live_config.toml` - 实时交易配置示例
 - `examples/complete_config.toml` - 完整配置选项参考
 - `examples/strict_risk_config.toml` - 严格风控配置示例

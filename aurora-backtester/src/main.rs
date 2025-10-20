@@ -21,8 +21,6 @@ use tracing::{error, info};
 mod pricing_mode;
 mod engine;
 
-use pricing_mode::PricingMode;
-
 #[derive(Parser)]
 #[command(name = "aurora-backtester")]
 #[command(about = "Aurora项目的回测引擎")]
@@ -103,9 +101,12 @@ async fn run_with_config(config_path: &str) -> Result<()> {
         .and_then(|p| p.as_usize())
         .unwrap_or(30);
 
+    // 获取定价模式配置
+    let pricing_mode_config = backtest_config.pricing_mode.as_ref();
+
     info!(
-        "开始回测: 数据文件={}, 策略={}, 参数={}:{}",
-        backtest_config.data_path, strategy.name, short, long
+        "开始回测: 数据文件={}, 策略={}, 参数={}:{}, 定价模式={:?}",
+        backtest_config.data_path, strategy.name, short, long, pricing_mode_config
     );
 
     // 运行回测
@@ -115,6 +116,7 @@ async fn run_with_config(config_path: &str) -> Result<()> {
         short,
         long,
         &config.portfolio,
+        pricing_mode_config,
     )
     .await
     {
@@ -161,7 +163,7 @@ async fn run_with_cli_args(cli: Cli) -> Result<()> {
     };
 
     // 运行回测
-    match engine::run_backtest(&data_path, &strategy_name, short, long, &portfolio_config).await {
+    match engine::run_backtest(&data_path, &strategy_name, short, long, &portfolio_config, None).await {
         Ok(_) => {
             info!("回测完成");
             Ok(())

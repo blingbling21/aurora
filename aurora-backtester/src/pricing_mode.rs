@@ -62,6 +62,25 @@ impl Default for PricingMode {
 }
 
 impl PricingMode {
+    /// 从配置创建定价模式
+    ///
+    /// # 参数
+    ///
+    /// * `config` - 定价模式配置，如果为 None 则使用默认值(Close)
+    ///
+    /// # 返回
+    ///
+    /// 定价模式实例
+    pub fn from_config(config: Option<&aurora_config::PricingModeConfig>) -> Self {
+        match config {
+            None => Self::default(),
+            Some(aurora_config::PricingModeConfig::Close) => Self::Close,
+            Some(aurora_config::PricingModeConfig::BidAsk { spread_pct }) => {
+                Self::BidAsk { spread_pct: *spread_pct }
+            }
+        }
+    }
+
     /// 计算买入价格
     ///
     /// 根据定价模式和K线数据计算买入时应该使用的价格。

@@ -73,5 +73,5 @@ mod types;
 pub use error::{ConfigError, ConfigResult};
 pub use types::{
     BacktestConfig, Config, DataSourceConfig, LiveConfig, LogConfig, PortfolioConfig,
-    PositionSizingConfig, RiskRulesConfig, StrategyConfig, StrategyParameter,
+    PositionSizingConfig, PricingModeConfig, RiskRulesConfig, StrategyConfig, StrategyParameter,
 };

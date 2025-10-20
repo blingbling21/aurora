@@ -278,6 +278,26 @@ pub struct BacktestConfig {
     /// 结束时间(可选)
     #[serde(default)]
     pub end_time: Option<String>,
+
+    /// 定价模式配置(可选)
+    #[serde(default)]
+    pub pricing_mode: Option<PricingModeConfig>,
+}
+
+/// 定价模式配置
+///
+/// 用于控制回测中交易价格的计算方式
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum PricingModeConfig {
+    /// 使用收盘价执行交易(简单模式)
+    Close,
+
+    /// 使用买一卖一价执行交易(更真实的模式)
+    BidAsk {
+        /// 买卖价差百分比(例如 0.001 表示 0.1% 的价差)
+        spread_pct: f64,
+    },
 }
 
 /// 实时交易配置
@@ -578,6 +598,24 @@ impl PositionSizingConfig {
             PositionSizingConfig::AllIn => {}
         }
         Ok(())
+    }
+}
+
+impl PricingModeConfig {
+    /// 验证配置是否有效
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            PricingModeConfig::Close => Ok(()),
+            PricingModeConfig::BidAsk { spread_pct } => {
+                if *spread_pct < 0.0 || *spread_pct > 0.1 {
+                    return Err(format!(
+                        "价差百分比必须在0-0.1之间(0-10%),当前值: {}",
+                        spread_pct
+                    ));
+                }
+                Ok(())
+            }
+        }
     }
 }
 

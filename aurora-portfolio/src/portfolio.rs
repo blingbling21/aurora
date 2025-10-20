@@ -186,6 +186,15 @@ impl BasePortfolio {
         self
     }
 
+    /// 获取风险管理器的可变引用（如果存在）
+    ///
+    /// # 返回值
+    ///
+    /// 返回风险管理器的可变引用，如果没有则返回 None
+    pub fn get_risk_manager_mut(&mut self) -> Option<&mut RiskManager> {
+        self.risk_manager.as_mut()
+    }
+
     /// 检查是否可以买入
     ///
     /// # 参数
