@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurora - 量化交易回测平台</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- 侧边栏导航 -->
+        <nav class="sidebar">
+            <div class="logo">
+                <h1>🌟 Aurora</h1>
+                <p>量化交易回测平台</p>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-page="dashboard">
+                    <span class="icon">📊</span>
+                    <span>仪表盘</span>
+                </li>
+                <li class="nav-item" data-page="config">
+                    <span class="icon">⚙️</span>
+                    <span>配置管理</span>
+                </li>
+                <li class="nav-item" data-page="data">
+                    <span class="icon">📁</span>
+                    <span>数据管理</span>
+                </li>
+                <li class="nav-item" data-page="backtest">
+                    <span class="icon">🚀</span>
+                    <span>回测执行</span>
+                </li>
+                <li class="nav-item" data-page="history">
+                    <span class="icon">📜</span>
+                    <span>历史记录</span>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 仪表盘页面 -->
+            <div id="dashboard-page" class="page active">
+                <div class="page-header">
+                    <h2>📊 仪表盘</h2>
+                    <p>回测任务概览与实时监控</p>
+                </div>
+                <div class="dashboard-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📈</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="total-tasks">0</div>
+                            <div class="stat-label">总任务数</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⏳</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="running-tasks">0</div>
+                            <div class="stat-label">运行中</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="completed-tasks">0</div>
+                            <div class="stat-label">已完成</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">❌</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="failed-tasks">0</div>
+                            <div class="stat-label">失败</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>最近任务</h3>
+                    <div id="recent-tasks-list" class="task-list"></div>
+                </div>
+            </div>
+
+            <!-- 配置管理页面 -->
+            <div id="config-page" class="page">
+                <div class="page-header">
+                    <h2>⚙️ 配置管理</h2>
+                    <button class="btn btn-primary" id="new-config-btn">+ 新建配置</button>
+                </div>
+                <div class="card">
+                    <h3>配置文件列表</h3>
+                    <div id="config-list" class="file-list"></div>
+                </div>
+                <div class="card" id="config-editor-card" style="display:none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3>编辑配置</h3>
+                        <div class="button-group">
+                            <input type="file" id="config-import-file" accept=".toml" style="display: none;">
+                            <button class="btn btn-secondary" id="import-config-btn">📁 导入 TOML</button>
+                            <button class="btn btn-secondary" id="toggle-editor-mode">🔄 切换模式</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="config-filename">文件名:</label>
+                        <input type="text" id="config-filename" placeholder="example.toml">
+                    </div>
+
+                    <!-- 表单模式 -->
+                    <div id="config-form-mode">
+                        <h4>数据源配置</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="form-provider">数据提供商:</label>
+                                <select id="form-provider">
+                                    <option value="binance">Binance</option>
+                                    <option value="okx">OKX</option>
+                                    <option value="bybit">Bybit</option>
+                                    <option value="csv">CSV File</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="form-timeout">超时时间 (秒):</label>
+                                <input type="number" id="form-timeout" value="30" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="form-retries">最大重试次数:</label>
+                                <input type="number" id="form-retries" value="3" min="0">
+                            </div>
+                        </div>
+
+                        <h4>策略配置</h4>
+                        <div class="form-group">
+                            <label for="form-strategy-name">策略名称:</label>
+                            <input type="text" id="form-strategy-name" value="MA交叉策略">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="form-strategy-type">策略类型:</label>
+                                <select id="form-strategy-type">
+                                    <option value="ma-crossover">均线交叉</option>
+                                    <option value="rsi">RSI</option>
+                                    <option value="macd">MACD</option>
+                                    <option value="bollinger">布林带</option>
+                                    <option value="custom">自定义</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="form-strategy-enabled" checked>
+                                    启用策略
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-row" id="ma-params">
+                            <div class="form-group">
+                                <label for="form-ma-short">短期均线:</label>
+                                <input type="number" id="form-ma-short" value="10" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="form-ma-long">长期均线:</label>
+                                <input type="number" id="form-ma-long" value="30" min="1">
+                            </div>
+                        </div>
+
+                        <h4>投资组合配置</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="form-initial-cash">初始资金:</label>
+                                <input type="number" id="form-initial-cash" value="10000" step="0.01" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="form-commission">手续费率 (%):</label>
+                                <input type="number" id="form-commission" value="0.1" step="0.01" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="form-slippage">滑点 (%):</label>
+                                <input type="number" id="form-slippage" value="0.05" step="0.01" min="0">
+                            </div>
+                        </div>
+
+                        <h4>风险管理</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="form-stop-loss">止损 (%):</label>
+                                <input type="number" id="form-stop-loss" value="2" step="0.1" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="form-take-profit">止盈 (%):</label>
+                                <input type="number" id="form-take-profit" value="5" step="0.1" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="form-max-drawdown">最大回撤 (%):</label>
+                                <input type="number" id="form-max-drawdown" value="15" step="0.1" min="0">
+                            </div>
+                        </div>
+
+                        <h4>回测时间范围</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="form-start-time">开始时间:</label>
+                                <input type="datetime-local" id="form-start-time" value="2024-01-01T00:00">
+                            </div>
+                            <div class="form-group">
+                                <label for="form-end-time">结束时间:</label>
+                                <input type="datetime-local" id="form-end-time" value="2024-12-31T23:59">
+                            </div>
+                        </div>
+
+                        <h4>定价模式</h4>
+                        <div class="form-group">
+                            <label for="form-pricing-mode">定价模式:</label>
+                            <select id="form-pricing-mode">
+                                <option value="close">收盘价</option>
+                                <option value="open">开盘价</option>
+                                <option value="high">最高价</option>
+                                <option value="low">最低价</option>
+                                <option value="vwap">成交量加权平均价</option>
+                                <option value="bidask">买卖价差</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- TOML 编辑模式 -->
+                    <div id="config-text-mode" style="display: none;">
+                        <div class="form-group">
+                            <label for="config-content">配置内容 (TOML):</label>
+                            <textarea id="config-content" rows="20" placeholder="在此输入TOML配置..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-primary" id="save-config-btn">💾 保存</button>
+                        <button class="btn btn-secondary" id="validate-config-btn">✓ 验证</button>
+                        <button class="btn btn-secondary" id="cancel-config-btn">✕ 取消</button>
+                    </div>
+                    <div id="config-validation-result" class="validation-result"></div>
+                </div>
+            </div>
+
+            <!-- 数据管理页面 -->
+            <div id="data-page" class="page">
+                <div class="page-header">
+                    <h2>📁 数据管理</h2>
+                    <p>管理和下载历史市场数据</p>
+                </div>
+                
+                <!-- 数据获取表单 -->
+                <div class="card">
+                    <h3>📥 下载历史数据</h3>
+                    <form id="fetch-data-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="data-exchange">交易所:</label>
+                                <select id="data-exchange" required>
+                                    <option value="">-- 请选择 --</option>
+                                    <option value="binance">Binance</option>
+                                    <option value="okx">OKX</option>
+                                    <option value="bybit">Bybit</option>
+                                    <option value="coinbase">Coinbase</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="data-symbol">交易对:</label>
+                                <div style="display: flex; gap: 8px;">
+                                    <select id="data-symbol-select" style="flex: 1;">
+                                        <option value="">-- 手动输入或选择 --</option>
+                                        <optgroup label="主流币对">
+                                            <option value="BTCUSDT">BTCUSDT - 比特币</option>
+                                            <option value="ETHUSDT">ETHUSDT - 以太坊</option>
+                                            <option value="BNBUSDT">BNBUSDT - 币安币</option>
+                                            <option value="SOLUSDT">SOLUSDT - Solana</option>
+                                            <option value="XRPUSDT">XRPUSDT - 瑞波币</option>
+                                        </optgroup>
+                                        <optgroup label="其他币对">
+                                            <option value="ADAUSDT">ADAUSDT - 艾达币</option>
+                                            <option value="DOGEUSDT">DOGEUSDT - 狗狗币</option>
+                                            <option value="DOTUSDT">DOTUSDT - 波卡</option>
+                                            <option value="MATICUSDT">MATICUSDT - Polygon</option>
+                                            <option value="AVAXUSDT">AVAXUSDT - Avalanche</option>
+                                        </optgroup>
+                                    </select>
+                                    <input type="text" id="data-symbol" required placeholder="例如: BTCUSDT" style="flex: 2; text-transform: uppercase;">
+                                </div>
+                                <small style="color: var(--text-secondary); font-size: 12px; display: block; margin-top: 4px;">
+                                    💡 提示: 可以从下拉框选择常用交易对，或手动输入
+                                </small>
+                            </div>
+                            <div class="form-group">
+                                <label for="data-interval">时间周期:</label>
+                                <select id="data-interval" required>
+                                    <option value="">-- 请选择 --</option>
+                                    <option value="1m">1分钟</option>
+                                    <option value="5m">5分钟</option>
+                                    <option value="15m">15分钟</option>
+                                    <option value="30m">30分钟</option>
+                                    <option value="1h">1小时</option>
+                                    <option value="4h">4小时</option>
+                                    <option value="1d">1天</option>
+                                    <option value="1w">1周</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="data-start-date">开始日期:</label>
+                                <input type="date" id="data-start-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="data-end-date">结束日期:</label>
+                                <input type="date" id="data-end-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="data-filename">保存文件名:</label>
+                                <input type="text" id="data-filename" placeholder="自动生成" readonly style="background: var(--bg-color);">
+                            </div>
+                        </div>
+                        <div class="button-group">
+                            <button type="submit" class="btn btn-primary">📥 下载数据</button>
+                            <button type="button" class="btn btn-secondary" id="preview-filename-btn">👁️ 预览文件名</button>
+                        </div>
+                    </form>
+                    <div id="fetch-progress" class="progress-container" style="display: none;">
+                        <div class="progress-info">
+                            <span id="fetch-status">准备下载...</span>
+                            <span id="fetch-percentage">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="fetch-progress-bar" class="progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 数据文件列表 -->
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3>数据文件列表</h3>
+                        <button class="btn btn-secondary" id="refresh-data-btn">🔄 刷新</button>
+                    </div>
+                    <div id="data-list" class="file-list"></div>
+                </div>
+            </div>
+
+            <!-- 回测执行页面 -->
+            <div id="backtest-page" class="page">
+                <div class="page-header">
+                    <h2>🚀 回测执行</h2>
+                    <p>配置并启动新的回测任务</p>
+                </div>
+                <div class="card">
+                    <h3>启动新回测</h3>
+                    <form id="backtest-form">
+                        <div class="form-group">
+                            <label for="backtest-name">任务名称:</label>
+                            <input type="text" id="backtest-name" required placeholder="例如: BTC MA交叉策略测试">
+                        </div>
+                        <div class="form-group">
+                            <label for="backtest-config">选择配置文件:</label>
+                            <select id="backtest-config" required>
+                                <option value="">-- 请选择 --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="backtest-data">选择数据文件:</label>
+                            <select id="backtest-data" required>
+                                <option value="">-- 请选择 --</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">🚀 启动回测</button>
+                    </form>
+                </div>
+                <div class="card" id="backtest-progress-card" style="display:none;">
+                    <h3>回测进度</h3>
+                    <div class="progress-info">
+                        <div class="progress-label">
+                            <span id="progress-task-name">任务名称</span>
+                            <span id="progress-percentage">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-status" id="progress-status">准备中...</div>
+                    </div>
+                    <button class="btn btn-secondary" id="view-result-btn" style="display:none;">查看结果</button>
+                </div>
+            </div>
+
+            <!-- 历史记录页面 -->
+            <div id="history-page" class="page">
+                <div class="page-header">
+                    <h2>📜 历史记录</h2>
+                    <button class="btn btn-secondary" id="refresh-history-btn">🔄 刷新</button>
+                </div>
+                <div class="card">
+                    <h3>回测历史</h3>
+                    <div id="history-list" class="task-list"></div>
+                </div>
+                <div class="card" id="result-viewer" style="display:none;">
+                    <h3>回测结果</h3>
+                    <div id="result-content">
+                        <div class="result-summary" id="result-summary"></div>
+                        <div class="chart-container">
+                            <canvas id="equity-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 通知提示 -->
+    <div id="notification" class="notification"></div>
+
+    <script src="js/app.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/backtest.js"></script>
+    <script src="js/charts.js"></script>
+</body>
+</html>

@@ -291,6 +291,75 @@ let initial_cash = config.portfolio.initial_cash;
 - ✅ 动态止损止盈配置（stop_loss_pct/take_profit_pct）
 - ✅ 灵活的仓位管理策略配置
 
+---
+
+#### 🌐 **`aurora-web`** (可执行文件 + 库) ⭐ **NEW**
+> Web管理界面 - 图形化配置、回测和结果分析
+
+**核心功能**：
+- **配置管理**：创建、编辑、验证配置文件
+- **数据管理**：查看和管理历史数据文件
+- **回测执行**：通过Web界面启动和监控回测任务
+- **实时监控**：WebSocket实时推送回测进度
+- **结果分析**：图形化展示回测结果和性能指标
+- **历史记录**：查看所有回测任务历史
+
+**技术栈**：
+- 后端：Actix-Web 4.9 + Tokio (异步Rust Web框架)
+- 前端：HTML5 + CSS3 + Vanilla JS (轻量级单页应用)
+- 可视化：Chart.js 4.4 (权益曲线、回撤曲线等)
+- 通信：RESTful API + WebSocket (实时双向通信)
+
+**API端点**：
+- `/api/config` - 配置管理 (7个端点)
+- `/api/backtest` - 回测执行 (5个端点)
+- `/api/data` - 数据管理 (3个端点)
+- `/ws/backtest/{id}` - WebSocket进度推送
+
+**启动命令**：
+```bash
+# 启动Web服务器
+cargo run -p aurora-web
+
+# 或使用启动脚本
+.\start-web.ps1
+
+# 访问: http://localhost:8080
+```
+
+**界面功能**：
+- 📊 仪表盘：任务概览和统计
+- ⚙️ 配置管理：TOML配置文件编辑器
+- 📁 数据管理：CSV文件列表和信息
+- 🚀 回测执行：表单配置和实时进度
+- 📜 历史记录：任务列表和结果查看
+
+**特点**：
+- 无需命令行，纯图形化操作
+- 实时进度显示，无需等待
+- 配置验证，避免参数错误
+- 结果可视化，直观分析性能
+- 完整文档，5分钟快速上手
+
+**快速开始**：
+```bash
+# 1. 准备数据和配置
+mkdir data configs
+cp examples/backtest_config.toml configs/
+
+# 2. 启动服务器
+cargo run -p aurora-web
+
+# 3. 打开浏览器访问 http://localhost:8080
+```
+
+📖 **详细文档**：
+- [快速开始指南](aurora-web/docs/QUICK_START.md)
+- [完整用户指南](aurora-web/docs/USER_GUIDE.md)
+- [项目实现总结](aurora-web/docs/PROJECT_SUMMARY.md)
+
+---
+
 ### 架构特点
 
 - **模块化设计**: 各功能组件高度解耦，易于独立开发和测试
