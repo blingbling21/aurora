@@ -232,7 +232,7 @@ function displayHistory() {
     }
 
     container.innerHTML = appState.tasks.map(task => `
-        <div class="task-item" onclick="viewTaskResult('${task.id}')">
+        <div class="task-item" onclick="viewTaskResult('${task.id}')" style="cursor: pointer;">
             <div class="task-header">
                 <span class="task-name">${task.name}</span>
                 <span class="task-status status-${task.status}">${getStatusText(task.status)}</span>
@@ -243,7 +243,8 @@ function displayHistory() {
                 ${task.completed_at ? `<span>✓ 完成: ${formatDate(task.completed_at)}</span>` : ''}
                 <span>⏱️ 进度: ${task.progress}%</span>
             </div>
-            ${task.error ? `<div style="color: var(--danger-color); font-size: 12px; margin-top: 8px;">错误: ${task.error}</div>` : ''}
+            ${task.error ? `<div style="color: var(--danger-color); font-size: 12px; margin-top: 8px;">❌ 错误: ${task.error}</div>` : ''}
+            ${task.status === 'completed' ? `<div style="color: var(--primary-color); font-size: 12px; margin-top: 8px;">💡 点击查看详细结果和图表</div>` : ''}
         </div>
     `).join('');
 }

@@ -410,3 +410,153 @@ impl Strategy for MACrossoverStrategy {
         }
     }
 }
+
+/// Buy & Hold 基准策略
+///
+/// 这是一个用于对比的基准策略，模拟在第一次接收到市场数据时买入并一直持有的行为。
+/// 主要用于计算策略相对于简单持有的超额收益（Alpha）。
+///
+/// ## 策略原理
+///
+/// - **首次信号**: 在接收到第一个K线数据时产生买入信号
+/// - **持有**: 之后一直持有，不产生任何交易信号
+///
+/// ## 适用场景
+///
+/// 此策略主要用作基准对比，不应作为实际交易策略使用。
+/// 它帮助评估主动策略是否能够跑赢简单的买入持有策略。
+///
+/// ## 示例
+///
+/// ```rust
+/// use aurora_strategy::BuyAndHoldStrategy;
+/// use aurora_core::{MarketEvent, Kline, Strategy};
+///
+/// let mut strategy = BuyAndHoldStrategy::new();
+///
+/// let kline = Kline {
+///     timestamp: 1640995200,
+///     open: 100.0,
+///     high: 105.0,
+///     low: 95.0,
+///     close: 102.0,
+///     volume: 1000.0,
+/// };
+///
+/// let event = MarketEvent::Kline(kline);
+/// 
+/// // 第一次调用会产生买入信号
+/// if let Some(signal_event) = strategy.on_market_event(&event) {
+///     assert_eq!(signal_event.signal, aurora_core::Signal::Buy);
+/// }
+///
+/// // 之后不再产生任何信号
+/// assert!(strategy.on_market_event(&event).is_none());
+/// ```
+#[derive(Debug, Clone)]
+pub struct BuyAndHoldStrategy {
+    /// 是否已经买入
+    /// true表示已经产生过买入信号，不再产生新信号
+    has_bought: bool,
+}
+
+impl BuyAndHoldStrategy {
+    /// 创建新的 Buy & Hold 策略实例
+    ///
+    /// # 返回值
+    ///
+    /// 返回一个新的策略实例，初始状态为未买入
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// use aurora_strategy::BuyAndHoldStrategy;
+    ///
+    /// let strategy = BuyAndHoldStrategy::new();
+    /// assert!(!strategy.has_bought());
+    /// ```
+    pub fn new() -> Self {
+        Self { has_bought: false }
+    }
+
+    /// 检查是否已经买入
+    ///
+    /// # 返回值
+    ///
+    /// 如果已经产生过买入信号则返回true，否则返回false
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// use aurora_strategy::BuyAndHoldStrategy;
+    ///
+    /// let strategy = BuyAndHoldStrategy::new();
+    /// assert!(!strategy.has_bought());
+    /// ```
+    pub fn has_bought(&self) -> bool {
+        self.has_bought
+    }
+
+    /// 重置策略状态
+    ///
+    /// 将策略恢复到初始未买入状态
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// use aurora_strategy::BuyAndHoldStrategy;
+    ///
+    /// let mut strategy = BuyAndHoldStrategy::new();
+    /// // ... 执行一些操作 ...
+    /// strategy.reset();
+    /// assert!(!strategy.has_bought());
+    /// ```
+    pub fn reset(&mut self) {
+        self.has_bought = false;
+    }
+}
+
+impl Default for BuyAndHoldStrategy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Strategy for BuyAndHoldStrategy {
+    /// 处理市场事件并执行 Buy & Hold 策略逻辑
+    ///
+    /// # 参数
+    ///
+    /// * `event` - 市场事件
+    ///
+    /// # 返回值
+    ///
+    /// * `Some(SignalEvent)` - 首次调用时返回买入信号
+    /// * `None` - 已买入后不再产生任何信号
+    ///
+    /// # 处理流程
+    ///
+    /// 1. 如果尚未买入，产生买入信号并标记为已买入
+    /// 2. 如果已买入，不产生任何信号（持有状态）
+    ///
+    /// # 设计考虑
+    ///
+    /// 使用收盘价作为买入价格，与实际交易场景更接近
+    fn on_market_event(&mut self, event: &MarketEvent) -> Option<SignalEvent> {
+        match event {
+            MarketEvent::Kline(kline) => {
+                if !self.has_bought {
+                    // 首次接收到数据时买入
+                    self.has_bought = true;
+                    return Some(SignalEvent {
+                        signal: Signal::Buy,
+                        price: kline.close,
+                        timestamp: kline.timestamp,
+                    });
+                }
+                // 已买入后持有，不产生任何信号
+                None
+            }
+        }
+    }
+}

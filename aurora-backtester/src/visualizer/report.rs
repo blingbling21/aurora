@@ -260,7 +260,23 @@ fn generate_html_content(data: &BacktestData) -> String {
                 <div class="metric-value negative">{:.2}%</div>
             </div>
             <div class="metric-card">
+                <div class="metric-label">回撤持续时间</div>
+                <div class="metric-value">{:.1} 天</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">年化波动率</div>
+                <div class="metric-value">{:.2}%</div>
+            </div>
+            <div class="metric-card">
                 <div class="metric-label">夏普比率</div>
+                <div class="metric-value">{:.2}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">索提诺比率</div>
+                <div class="metric-value">{:.2}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">卡玛比率</div>
                 <div class="metric-value">{:.2}</div>
             </div>
             <div class="metric-card">
@@ -270,6 +286,14 @@ fn generate_html_content(data: &BacktestData) -> String {
             <div class="metric-card">
                 <div class="metric-label">盈亏比</div>
                 <div class="metric-value">{:.2}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">利润因子</div>
+                <div class="metric-value">{:.2}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">平均持仓时间</div>
+                <div class="metric-value">{:.1}h</div>
             </div>
         </div>
 
@@ -325,6 +349,26 @@ fn generate_html_content(data: &BacktestData) -> String {
                     <span class="summary-label">盈亏比</span>
                     <span class="summary-value">{:.2}</span>
                 </div>
+                <div class="summary-item">
+                    <span class="summary-label">利润因子</span>
+                    <span class="summary-value">{:.2}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">最大单笔盈利</span>
+                    <span class="summary-value">${:.2}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">最大单笔亏损</span>
+                    <span class="summary-value">${:.2}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">最大连续盈利</span>
+                    <span class="summary-value">{}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">最大连续亏损</span>
+                    <span class="summary-value">{}</span>
+                </div>
             </div>
         </div>
 
@@ -339,9 +383,15 @@ fn generate_html_content(data: &BacktestData) -> String {
         if metrics.annualized_return >= 0.0 { "positive" } else { "negative" },
         metrics.annualized_return * 100.0,
         metrics.max_drawdown * 100.0,
+        metrics.max_drawdown_duration,
+        metrics.annualized_volatility,
         metrics.sharpe_ratio,
+        metrics.sortino_ratio,
+        metrics.calmar_ratio,
         metrics.win_rate * 100.0,
         metrics.profit_loss_ratio,
+        metrics.profit_factor,
+        metrics.avg_holding_period,
         data.initial_cash,
         data.initial_cash * (1.0 + metrics.total_return),
         metrics.total_trades,
@@ -350,6 +400,11 @@ fn generate_html_content(data: &BacktestData) -> String {
         metrics.average_win,
         metrics.average_loss,
         metrics.profit_loss_ratio,
+        metrics.profit_factor,
+        metrics.max_win,
+        metrics.max_loss,
+        metrics.max_consecutive_wins,
+        metrics.max_consecutive_losses,
     )
 }
 
@@ -382,7 +437,11 @@ mod tests {
                 total_return: 0.1,
                 annualized_return: 0.15,
                 max_drawdown: 0.05,
+                max_drawdown_duration: 5.0,
+                annualized_volatility: 12.5,
                 sharpe_ratio: 1.5,
+                sortino_ratio: 1.8,
+                calmar_ratio: 3.0,
                 win_rate: 0.6,
                 total_trades: 10,
                 winning_trades: 6,
@@ -390,6 +449,12 @@ mod tests {
                 average_win: 150.0,
                 average_loss: -50.0,
                 profit_loss_ratio: 3.0,
+                profit_factor: 2.5,
+                max_consecutive_wins: 3,
+                max_consecutive_losses: 2,
+                avg_holding_period: 24.0,
+                max_win: 300.0,
+                max_loss: -100.0,
             },
             initial_cash: 10000.0,
         }

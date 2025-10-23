@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aurora - 量化交易回测平台</title>
     <link rel="stylesheet" href="css/style.css">
+    <!-- Chart.js for line charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Lightweight Charts for candlestick charts -->
+    <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
     <div class="container">
@@ -401,8 +404,16 @@
                     <h3>回测结果</h3>
                     <div id="result-content">
                         <div class="result-summary" id="result-summary"></div>
-                        <div class="chart-container">
-                            <canvas id="equity-chart"></canvas>
+                        <div class="charts-grid">
+                            <div class="chart-container">
+                                <canvas id="equity-chart"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="drawdown-chart"></canvas>
+                            </div>
+                            <div class="chart-container chart-full-width">
+                                <div id="trading-chart" style="height: 400px;"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -418,5 +429,6 @@
     <script src="js/data.js"></script>
     <script src="js/backtest.js"></script>
     <script src="js/charts.js"></script>
+    <script src="js/tradingview.js"></script>
 </body>
 </html>

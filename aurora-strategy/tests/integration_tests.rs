@@ -1,7 +1,7 @@
 //! 策略模块集成测试
 
 use aurora_core::{Kline, MarketEvent, Signal, Strategy};
-use aurora_strategy::MACrossoverStrategy;
+use aurora_strategy::{BuyAndHoldStrategy, MACrossoverStrategy};
 
 /// 测试MA交叉策略的基本功能
 #[test]
@@ -277,4 +277,97 @@ fn create_test_kline(close_price: f64, timestamp: i64) -> Kline {
         close: close_price,
         volume: 1000.0,
     }
+}
+
+/// 测试 Buy & Hold 策略的基本功能
+#[test]
+fn test_buy_and_hold_strategy_basic() {
+    let mut strategy = BuyAndHoldStrategy::new();
+
+    // 初始状态应该未买入
+    assert!(!strategy.has_bought());
+
+    // 第一次接收K线数据应该产生买入信号
+    let kline = create_test_kline(100.0, 1640995200000);
+    let event = MarketEvent::Kline(kline.clone());
+    let signal = strategy.on_market_event(&event);
+
+    assert!(signal.is_some());
+    let signal_event = signal.unwrap();
+    assert_eq!(signal_event.signal, Signal::Buy);
+    assert_eq!(signal_event.price, kline.close);
+    assert_eq!(signal_event.timestamp, kline.timestamp);
+
+    // 现在应该已买入
+    assert!(strategy.has_bought());
+}
+
+/// 测试 Buy & Hold 策略在买入后不再产生信号
+#[test]
+fn test_buy_and_hold_no_signals_after_buy() {
+    let mut strategy = BuyAndHoldStrategy::new();
+
+    // 第一次买入
+    let kline1 = create_test_kline(100.0, 1640995200000);
+    let event1 = MarketEvent::Kline(kline1);
+    let signal1 = strategy.on_market_event(&event1);
+    assert!(signal1.is_some());
+
+    // 之后的所有K线都不应该产生信号
+    let test_prices = vec![105.0, 110.0, 95.0, 90.0, 120.0];
+    let mut timestamp = 1640995260000;
+
+    for price in test_prices {
+        let kline = create_test_kline(price, timestamp);
+        let event = MarketEvent::Kline(kline);
+        let signal = strategy.on_market_event(&event);
+        assert!(signal.is_none(), "价格为 {} 时不应该产生信号", price);
+        timestamp += 60000;
+    }
+}
+
+/// 测试 Buy & Hold 策略的重置功能
+#[test]
+fn test_buy_and_hold_reset() {
+    let mut strategy = BuyAndHoldStrategy::new();
+
+    // 第一次买入
+    let kline1 = create_test_kline(100.0, 1640995200000);
+    let event1 = MarketEvent::Kline(kline1);
+    strategy.on_market_event(&event1);
+    assert!(strategy.has_bought());
+
+    // 重置策略
+    strategy.reset();
+    assert!(!strategy.has_bought());
+
+    // 重置后应该能再次产生买入信号
+    let kline2 = create_test_kline(110.0, 1640995260000);
+    let event2 = MarketEvent::Kline(kline2);
+    let signal = strategy.on_market_event(&event2);
+    assert!(signal.is_some());
+    assert_eq!(signal.unwrap().signal, Signal::Buy);
+}
+
+/// 测试 Buy & Hold 策略的默认实现
+#[test]
+fn test_buy_and_hold_default() {
+    let strategy = BuyAndHoldStrategy::default();
+    assert!(!strategy.has_bought());
+}
+
+/// 测试 Buy & Hold 策略的克隆功能
+#[test]
+fn test_buy_and_hold_clone() {
+    let mut strategy1 = BuyAndHoldStrategy::new();
+    
+    // 产生买入信号
+    let kline = create_test_kline(100.0, 1640995200000);
+    let event = MarketEvent::Kline(kline);
+    strategy1.on_market_event(&event);
+    assert!(strategy1.has_bought());
+
+    // 克隆策略
+    let strategy2 = strategy1.clone();
+    assert!(strategy2.has_bought());
 }

@@ -15,12 +15,14 @@
 pub mod engine;
 pub mod portfolio;
 pub mod pricing_mode;
+pub mod result;
 pub mod vectorized_engine;
 pub mod visualizer;
 
 pub use engine::*;
 pub use portfolio::*;
 pub use pricing_mode::*;
+pub use result::*;
 pub use vectorized_engine::*;
 pub use visualizer::*;
 

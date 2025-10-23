@@ -15,13 +15,14 @@
 use anyhow::{Result, anyhow};
 use aurora_config::PortfolioConfig;
 use aurora_core::{Kline, MarketEvent, Signal, Strategy};
-use aurora_portfolio::{BasePortfolio, Portfolio};
-use aurora_strategy::MACrossoverStrategy;
+use aurora_portfolio::{BasePortfolio, Portfolio, PortfolioAnalytics};
+use aurora_strategy::{BuyAndHoldStrategy, MACrossoverStrategy};
 use std::path::Path;
 use tracing::{debug, error, info};
 
-// 始终使用相对路径，main.rs 将会声明这个模块
+// 在库内部使用相对路径
 use crate::pricing_mode::PricingMode;
+use crate::result::BacktestResult;
 
 /// 运行回测
 pub async fn run_backtest(
@@ -31,7 +32,7 @@ pub async fn run_backtest(
     long_period: usize,
     portfolio_config: &PortfolioConfig,
     pricing_mode_config: Option<&aurora_config::PricingModeConfig>,
-) -> Result<()> {
+) -> Result<BacktestResult> {
     // 验证数据文件是否存在
     if !Path::new(data_path).exists() {
         return Err(anyhow!("数据文件不存在: {}", data_path));
@@ -61,9 +62,9 @@ pub async fn run_backtest(
 
     // 创建回测引擎并运行
     let mut engine = BacktestEngine::with_pricing_mode(strategy, portfolio_config, pricing_mode)?;
-    engine.run(&klines).await?;
+    let result = engine.run(&klines, Some(data_path.to_string())).await?;
 
-    Ok(())
+    Ok(result)
 }
 
 /// 从CSV文件加载K线数据
@@ -167,7 +168,12 @@ impl BacktestEngine {
     }
 
     /// 运行回测
-    pub async fn run(&mut self, klines: &[Kline]) -> Result<()> {
+    ///
+    /// # 参数
+    ///
+    /// * `klines` - K线数据
+    /// * `data_path` - 数据文件路径（可选）
+    pub async fn run(&mut self, klines: &[Kline], data_path: Option<String>) -> Result<BacktestResult> {
         info!(
             "开始回测，数据时间范围: {} - {}",
             klines.first().map(|k| k.timestamp).unwrap_or(0),
@@ -286,7 +292,7 @@ impl BacktestEngine {
 
         info!("回测完成，处理了 {} 条K线数据", processed_count);
 
-        // 计算并打印回测报告
+        // 计算回测报告
         let time_period_days = if !klines.is_empty() {
             let start_time = klines.first().unwrap().timestamp;
             let end_time = klines.last().unwrap().timestamp;
@@ -295,10 +301,126 @@ impl BacktestEngine {
             1.0
         };
 
+        // 从权益曲线获取初始权益
+        let initial_equity = self.portfolio.get_equity_curve()
+            .first()
+            .map(|p| p.equity)
+            .unwrap_or(self.portfolio.get_cash());
+        
+        let final_equity = self.portfolio.get_total_equity(
+            klines.last().map(|k| k.close).unwrap_or(0.0)
+        );
+        
         let metrics = self.portfolio.calculate_performance(time_period_days);
+        
+        // 打印报告（保留原有行为）
         metrics.print_report();
 
-        Ok(())
+        // 收集交易记录和权益曲线
+        let equity_curve = self.portfolio.get_equity_curve().to_vec();
+        let trades = self.portfolio.get_trades().to_vec();
+
+        //运行基准策略回测（Buy & Hold）
+        info!("开始运行基准策略（Buy & Hold）回测...");
+        let benchmark_result = self.run_benchmark(klines, initial_equity).await?;
+        
+        // 计算 Alpha
+        let benchmark_return = benchmark_result.metrics.total_return;
+        let alpha = PortfolioAnalytics::calculate_alpha(metrics.total_return, benchmark_return);
+        let annualized_alpha = PortfolioAnalytics::calculate_annualized_alpha(
+            metrics.total_return,
+            benchmark_return,
+            time_period_days,
+        );
+        
+        info!(
+            "基准收益率: {:.2}%, 策略收益率: {:.2}%, Alpha: {:.2}%, 年化Alpha: {:.2}%",
+            benchmark_return, metrics.total_return, alpha, annualized_alpha
+        );
+
+        // 创建并返回包含基准数据的结果
+        let result = BacktestResult::new_with_benchmark(
+            metrics,
+            equity_curve,
+            trades,
+            time_period_days,
+            initial_equity,
+            final_equity,
+            data_path,
+            benchmark_result.equity_curve,
+            benchmark_return,
+        );
+
+        Ok(result)
+    }
+
+    /// 运行基准策略（Buy & Hold）回测
+    ///
+    /// # 参数
+    ///
+    /// * `klines` - K线数据
+    /// * `initial_cash` - 初始资金
+    ///
+    /// # 返回值
+    ///
+    /// 返回基准策略的回测结果
+    async fn run_benchmark(&self, klines: &[Kline], initial_cash: f64) -> Result<BacktestResult> {
+        // 创建基准策略
+        let mut benchmark_strategy = BuyAndHoldStrategy::new();
+        
+        // 创建基准投资组合（只使用初始资金，不使用风险管理和仓位管理）
+        let mut benchmark_portfolio = BasePortfolio::new(initial_cash);
+        
+        // 运行基准回测
+        for kline in klines {
+            let market_event = MarketEvent::Kline(kline.clone());
+            
+            // 让基准策略处理事件
+            if let Some(signal_event) = benchmark_strategy.on_market_event(&market_event) {
+                match signal_event.signal {
+                    Signal::Buy => {
+                        let buy_price = self.pricing_mode.get_buy_price(kline);
+                        let _ = benchmark_portfolio.execute_buy(buy_price, signal_event.timestamp).await;
+                    }
+                    Signal::Sell => {
+                        let sell_price = self.pricing_mode.get_sell_price(kline);
+                        let _ = benchmark_portfolio.execute_sell(sell_price, signal_event.timestamp).await;
+                    }
+                    Signal::Hold => {}
+                }
+            }
+            
+            // 更新权益曲线
+            let mark_price = self.pricing_mode.get_mark_price(kline);
+            benchmark_portfolio.update_equity(kline.timestamp, mark_price);
+        }
+        
+        // 计算基准回测报告
+        let time_period_days = if !klines.is_empty() {
+            let start_time = klines.first().unwrap().timestamp;
+            let end_time = klines.last().unwrap().timestamp;
+            (end_time - start_time) as f64 / (24.0 * 60.0 * 60.0 * 1000.0)
+        } else {
+            1.0
+        };
+        
+        let final_equity = benchmark_portfolio.get_total_equity(
+            klines.last().map(|k| k.close).unwrap_or(0.0)
+        );
+        
+        let metrics = benchmark_portfolio.calculate_performance(time_period_days);
+        let equity_curve = benchmark_portfolio.get_equity_curve().to_vec();
+        let trades = benchmark_portfolio.get_trades().to_vec();
+        
+        Ok(BacktestResult::new(
+            metrics,
+            equity_curve,
+            trades,
+            time_period_days,
+            initial_cash,
+            final_equity,
+            None,
+        ))
     }
 
     /// 获取投资组合的引用
@@ -363,12 +485,12 @@ mod tests {
         let portfolio_config = create_test_portfolio_config();
         let mut engine = BacktestEngine::new(strategy, &portfolio_config).unwrap();
 
-        let result = engine.run(&klines).await;
+        let result = engine.run(&klines, None).await;
         assert!(result.is_ok());
-
-        // 验证投资组合状态
-        let portfolio = engine.portfolio();
-        assert!(!portfolio.get_equity_curve().is_empty());
+        
+        let backtest_result = result.unwrap();
+        assert_eq!(backtest_result.trades.len(), backtest_result.metrics.total_trades * 2);
+        assert!(!backtest_result.equity_curve.is_empty());
 
         // _temp_dir 在这里自动清理
     }

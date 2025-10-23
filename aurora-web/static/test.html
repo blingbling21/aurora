@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>回测结果测试页面</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div style="padding: 20px;">
+        <h1>回测结果显示测试</h1>
+        
+        <button id="test-btn" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">
+            点击测试显示结果
+        </button>
+        
+        <div class="card" id="result-viewer" style="display:none; margin-top: 20px;">
+            <h3>回测结果</h3>
+            <div id="result-content">
+                <div class="result-summary" id="result-summary"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 模拟数据
+        const mockData = {
+            task_id: "test-123",
+            result: {
+                metrics: {
+                    total_return: 25.5,
+                    annualized_return: 45.2,
+                    max_drawdown: -15.3,
+                    max_drawdown_duration: 30,
+                    sharpe_ratio: 1.85,
+                    sortino_ratio: 2.10,
+                    calmar_ratio: 2.95,
+                    annualized_volatility: 18.5,
+                    win_rate: 65.5,
+                    total_trades: 150,
+                    winning_trades: 98,
+                    losing_trades: 52,
+                    average_win: 250.50,
+                    average_loss: -120.30,
+                    profit_loss_ratio: 2.08,
+                    profit_factor: 2.45,
+                    max_consecutive_wins: 8,
+                    max_consecutive_losses: 4,
+                    avg_holding_period: 24.5,
+                    max_win: 1250.00,
+                    max_loss: -580.00
+                },
+                equity_curve: [],
+                trades: []
+            }
+        };
+
+        document.getElementById('test-btn').addEventListener('click', () => {
+            console.log('按钮被点击!');
+            const viewer = document.getElementById('result-viewer');
+            viewer.style.display = 'block';
+            
+            const result = mockData.result;
+            const metrics = result.metrics;
+            
+            const summary = document.getElementById('result-summary');
+            summary.innerHTML = `
+                <div class="result-metric">
+                    <div class="result-metric-label">总收益率</div>
+                    <div class="result-metric-value positive">
+                        ${metrics.total_return.toFixed(2)}%
+                    </div>
+                </div>
+                <div class="result-metric">
+                    <div class="result-metric-label">年化收益率</div>
+                    <div class="result-metric-value positive">
+                        ${metrics.annualized_return.toFixed(2)}%
+                    </div>
+                </div>
+                <div class="result-metric">
+                    <div class="result-metric-label">最大回撤</div>
+                    <div class="result-metric-value negative">
+                        ${metrics.max_drawdown.toFixed(2)}%
+                    </div>
+                </div>
+                <div class="result-metric">
+                    <div class="result-metric-label">夏普比率</div>
+                    <div class="result-metric-value">
+                        ${metrics.sharpe_ratio.toFixed(3)}
+                    </div>
+                </div>
+                <div class="result-metric">
+                    <div class="result-metric-label">总交易次数</div>
+                    <div class="result-metric-value">
+                        ${metrics.total_trades}
+                    </div>
+                </div>
+                <div class="result-metric">
+                    <div class="result-metric-label">胜率</div>
+                    <div class="result-metric-value">
+                        ${metrics.win_rate.toFixed(2)}%
+                    </div>
+                </div>
+                <div class="result-metric">
+                    <div class="result-metric-label">盈亏比</div>
+                    <div class="result-metric-value">
+                        ${metrics.profit_loss_ratio.toFixed(2)}
+                    </div>
+                </div>
+                <div class="result-metric">
+                    <div class="result-metric-label">利润因子</div>
+                    <div class="result-metric-value">
+                        ${metrics.profit_factor.toFixed(2)}
+                    </div>
+                </div>
+            `;
+            
+            console.log('结果已渲染!');
+        });
+    </script>
+</body>
+</html>

@@ -15,10 +15,12 @@
 //! 数据管理API
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     routing::{get, post},
     Json, Router,
 };
+use aurora_core::Kline;
+use serde::Deserialize;
 use std::fs;
 use tracing::{debug, info, warn};
 
@@ -31,6 +33,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/list", get(list_data_files))
         .route("/fetch", post(fetch_historical_data))
+        .route("/klines", get(get_klines_data))
         .route("/{filename}", get(get_data_file).delete(delete_data_file))
 }
 
@@ -277,4 +280,64 @@ fn parse_date_to_timestamp(date_str: &str) -> WebResult<i64> {
 
     // 转换为时间戳（秒），然后转换为毫秒
     Ok(datetime.and_utc().timestamp() * 1000)
+}
+
+/// K线数据查询参数
+#[derive(Debug, Deserialize)]
+struct KlinesQuery {
+    /// 数据文件路径（相对或绝对路径）
+    path: String,
+}
+
+/// 获取K线数据
+///
+/// 从CSV文件加载K线数据并返回给前端,用于绘制交易图表
+async fn get_klines_data(
+    State(state): State<AppState>,
+    Query(query): Query<KlinesQuery>,
+) -> WebResult<Json<SuccessResponse<Vec<Kline>>>> {
+    debug!("加载K线数据: {}", query.path);
+
+    // 处理路径:如果是相对路径,则相对于 data_dir
+    let data_path = if std::path::Path::new(&query.path).is_absolute() {
+        std::path::PathBuf::from(&query.path)
+    } else {
+        state.data_dir.join(&query.path)
+    };
+
+    // 验证文件存在
+    if !data_path.exists() {
+        return Err(WebError::DataNotFound(format!(
+            "数据文件不存在: {}",
+            query.path
+        )));
+    }
+
+    // 验证文件扩展名
+    if data_path.extension().and_then(|s| s.to_str()) != Some("csv") {
+        return Err(WebError::InvalidRequest(
+            "只支持 CSV 格式的数据文件".to_string(),
+        ));
+    }
+
+    // 读取CSV文件
+    let mut reader = csv::Reader::from_path(&data_path)
+        .map_err(|e| WebError::DataError(format!("无法读取CSV文件: {}", e)))?;
+
+    let mut klines = Vec::new();
+    for result in reader.deserialize() {
+        match result {
+            Ok(kline) => klines.push(kline),
+            Err(e) => {
+                warn!("解析K线数据失败: {}", e);
+                continue;
+            }
+        }
+    }
+
+    // 按时间戳排序
+    klines.sort_by_key(|k: &Kline| k.timestamp);
+
+    info!("成功加载 {} 条K线数据", klines.len());
+    Ok(Json(SuccessResponse::new(klines)))
 }
