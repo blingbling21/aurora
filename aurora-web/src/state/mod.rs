@@ -21,14 +21,18 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub mod backtest;
+pub mod download;
 
 pub use backtest::{BacktestTask, BacktestStatus};
+pub use download::{DownloadTask, DownloadStatus};
 
 /// 应用全局状态
 #[derive(Clone)]
 pub struct AppState {
     /// 回测任务映射表
     pub backtest_tasks: Arc<RwLock<HashMap<Uuid, BacktestTask>>>,
+    /// 数据下载任务映射表
+    pub download_tasks: Arc<RwLock<HashMap<Uuid, DownloadTask>>>,
     /// 数据文件目录
     pub data_dir: PathBuf,
     /// 配置文件目录

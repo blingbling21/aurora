@@ -47,6 +47,7 @@ async fn main() -> std::io::Result<()> {
     // 创建应用状态
     let app_state = AppState {
         backtest_tasks: Arc::new(RwLock::new(std::collections::HashMap::new())),
+        download_tasks: Arc::new(RwLock::new(std::collections::HashMap::new())),
         data_dir: std::path::PathBuf::from("./data"),
         config_dir: std::path::PathBuf::from("./configs"),
     };

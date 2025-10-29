@@ -224,6 +224,39 @@ impl BinanceHistoricalDownloader {
         end_time: i64,
         output_path: &str,
     ) -> DataResult<()> {
+        self.download_klines_with_progress(
+            symbol,
+            interval,
+            start_time,
+            end_time,
+            output_path,
+            None::<fn(usize, Option<usize>)>,
+        )
+        .await
+    }
+
+    /// 下载K线数据并保存到CSV文件（带进度回调）
+    ///
+    /// # 参数
+    ///
+    /// * `symbol` - 交易对符号
+    /// * `interval` - 时间间隔
+    /// * `start_time` - 开始时间（毫秒时间戳）
+    /// * `end_time` - 结束时间（毫秒时间戳）
+    /// * `output_path` - 输出文件路径
+    /// * `progress_callback` - 进度回调函数，接收 (已下载数量, 预计总数)
+    pub async fn download_klines_with_progress<F>(
+        &self,
+        symbol: &str,
+        interval: &str,
+        start_time: i64,
+        end_time: i64,
+        output_path: &str,
+        progress_callback: Option<F>,
+    ) -> DataResult<()>
+    where
+        F: Fn(usize, Option<usize>) + Send + Sync,
+    {
         // 分批获取数据，避免单次请求数据量过大
         let mut all_klines = Vec::new();
         let mut current_start = start_time;
@@ -231,6 +264,10 @@ impl BinanceHistoricalDownloader {
         // 计算每个间隔的毫秒数，用于分批请求
         let interval_ms = super::utils::parse_interval_to_ms(interval)?;
         let batch_size = 1000; // Binance API最大限制
+
+        // 估算总数据量
+        let time_range = end_time - start_time;
+        let estimated_total = (time_range / interval_ms) as usize;
 
         while current_start < end_time {
             // 计算这一批次的结束时间
@@ -263,6 +300,11 @@ impl BinanceHistoricalDownloader {
                 current_start = last_kline.timestamp + interval_ms;
             } else {
                 break;
+            }
+
+            // 调用进度回调
+            if let Some(ref callback) = progress_callback {
+                callback(all_klines.len(), Some(estimated_total));
             }
 
             // 避免请求过于频繁，添加小延迟

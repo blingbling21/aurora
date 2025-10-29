@@ -404,15 +404,23 @@
                     <h3>回测结果</h3>
                     <div id="result-content">
                         <div class="result-summary" id="result-summary"></div>
-                        <div class="charts-grid">
-                            <div class="chart-container">
-                                <canvas id="equity-chart"></canvas>
+                        
+                        <!-- 新布局：主图+副图 -->
+                        <div class="charts-layout">
+                            <!-- K线主图 -->
+                            <div class="chart-main-container">
+                                <h4 class="chart-section-title">价格走势与交易点位</h4>
+                                <div id="trading-chart" style="height: 500px; position: relative;"></div>
                             </div>
-                            <div class="chart-container">
-                                <canvas id="drawdown-chart"></canvas>
-                            </div>
-                            <div class="chart-container chart-full-width">
-                                <div id="trading-chart" style="height: 400px;"></div>
+                            
+                            <!-- 副图区域 -->
+                            <div class="charts-sub-grid">
+                                <div class="chart-sub-container">
+                                    <canvas id="equity-chart"></canvas>
+                                </div>
+                                <div class="chart-sub-container">
+                                    <canvas id="drawdown-chart"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -430,5 +438,6 @@
     <script src="js/backtest.js"></script>
     <script src="js/charts.js"></script>
     <script src="js/tradingview.js"></script>
+    <script src="js/chart-sync.js"></script>
 </body>
 </html>

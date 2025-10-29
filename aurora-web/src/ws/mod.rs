@@ -19,8 +19,11 @@ use axum::{routing::get, Router};
 use crate::state::AppState;
 
 pub mod backtest;
+pub mod data;
 
 /// WebSocket路由配置
 pub fn routes() -> Router<AppState> {
-    Router::new().route("/backtest/{id}", get(backtest::ws_handler))
+    Router::new()
+        .route("/backtest/{id}", get(backtest::ws_handler))
+        .route("/data/{id}", get(data::ws_handler))
 }

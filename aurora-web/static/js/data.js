@@ -155,14 +155,12 @@ async function handleFetchData(event) {
     const progressBar = document.getElementById('fetch-progress-bar');
     
     progressContainer.style.display = 'block';
-    statusText.textContent = '正在准备下载...';
+    statusText.textContent = '正在创建下载任务...';
     percentageText.textContent = '0%';
     progressBar.style.width = '0%';
     
     try {
-        // 模拟进度更新
-        updateProgress(10, '连接到交易所...');
-        
+        // 创建下载任务
         const response = await apiRequest('/data/fetch', {
             method: 'POST',
             body: JSON.stringify({
@@ -175,24 +173,28 @@ async function handleFetchData(event) {
             })
         });
         
-        updateProgress(100, '下载完成！');
+        console.log('创建任务响应:', response);
         
         if (response.success) {
-            showNotification(response.data, 'success');
+            const taskId = response.data.task_id;
+            const filename = response.data.filename;
+            const message = response.data.message || '任务已创建';
             
-            // 重置表单
-            document.getElementById('fetch-data-form').reset();
-            document.getElementById('data-filename').value = '';
-            document.getElementById('data-symbol-select').value = '';
+            console.log('任务ID:', taskId, '文件名:', filename);
             
-            // 刷新文件列表
+            statusText.textContent = '任务已创建，正在连接...';
+            showNotification(message, 'info');
+            
+            // 给后台任务一点时间启动，避免竞态条件
             setTimeout(() => {
-                loadDataFiles();
-                progressContainer.style.display = 'none';
-            }, 2000);
+                // 连接 WebSocket 监听进度
+                connectDownloadWebSocket(taskId, filename);
+            }, 100);
+        } else {
+            throw new Error(response.message || '创建任务失败');
         }
     } catch (error) {
-        updateProgress(0, '下载失败');
+        updateDownloadProgress(0, '创建任务失败');
         
         // 解析错误消息，提供更友好的提示
         let errorMessage = error.message || '获取数据失败';
@@ -209,6 +211,110 @@ async function handleFetchData(event) {
             progressContainer.style.display = 'none';
         }, 3000);
     }
+}
+
+// 连接下载进度 WebSocket
+function connectDownloadWebSocket(taskId, filename) {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/data/${taskId}`;
+    
+    console.log('连接数据下载 WebSocket:', wsUrl);
+    console.log('任务ID:', taskId, '文件名:', filename);
+    
+    const ws = new WebSocket(wsUrl);
+    let isClosedNormally = false;
+    
+    ws.onopen = () => {
+        console.log('WebSocket 已连接');
+        updateDownloadProgress(5, '已连接，等待下载开始...');
+    };
+    
+    ws.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            console.log('收到 WebSocket 消息:', data);
+            
+            switch (data.type) {
+                case 'connected':
+                    updateDownloadProgress(10, '已连接到服务器');
+                    break;
+                    
+                case 'progress':
+                    // 更新实时进度
+                    console.log('处理进度消息:', data);
+                    const progress = data.progress || 0;
+                    const message = data.progress_message || '下载中...';
+                    const downloaded = data.downloaded_count || 0;
+                    const total = data.estimated_total;
+                    
+                    let statusMessage = message;
+                    if (total) {
+                        statusMessage = `${message} (${Math.round(progress)}%)`;
+                    }
+                    
+                    console.log('准备更新进度:', progress, statusMessage);
+                    updateDownloadProgress(progress, statusMessage);
+                    break;
+                    
+                case 'complete':
+                    // 下载完成
+                    isClosedNormally = true;
+                    updateDownloadProgress(100, data.message || '下载完成！');
+                    
+                    if (data.status === 'completed') {
+                        showNotification(`成功下载 ${data.downloaded_count} 条数据到文件: ${filename}`, 'success');
+                        
+                        // 重置表单
+                        document.getElementById('fetch-data-form').reset();
+                        document.getElementById('data-filename').value = '';
+                        document.getElementById('data-symbol-select').value = '';
+                        
+                        // 刷新文件列表
+                        setTimeout(() => {
+                            loadDataFiles();
+                            document.getElementById('fetch-progress').style.display = 'none';
+                        }, 2000);
+                    } else if (data.status === 'failed') {
+                        showNotification(data.message || '下载失败', 'error');
+                        setTimeout(() => {
+                            document.getElementById('fetch-progress').style.display = 'none';
+                        }, 3000);
+                    }
+                    
+                    ws.close();
+                    break;
+                    
+                case 'error':
+                    isClosedNormally = true;
+                    showNotification(data.message || '下载过程中出错', 'error');
+                    ws.close();
+                    setTimeout(() => {
+                        document.getElementById('fetch-progress').style.display = 'none';
+                    }, 3000);
+                    break;
+            }
+        } catch (e) {
+            console.error('解析 WebSocket 消息失败:', e, '原始数据:', event.data);
+        }
+    };
+    
+    ws.onerror = (error) => {
+        console.error('WebSocket 错误:', error);
+        if (!isClosedNormally) {
+            showNotification('WebSocket 连接错误，但下载任务可能仍在后台执行', 'warning');
+            updateDownloadProgress(0, 'WebSocket 连接失败');
+        }
+    };
+    
+    ws.onclose = (event) => {
+        console.log('WebSocket 已关闭，代码:', event.code, '原因:', event.reason, '正常关闭:', isClosedNormally);
+        if (!isClosedNormally && event.code !== 1000) {
+            // 非正常关闭
+            showNotification('WebSocket 连接意外关闭，请刷新页面查看下载状态', 'warning');
+            // 不要隐藏进度条，让用户知道可能还在下载
+            updateDownloadProgress(0, 'WebSocket 断开，下载可能仍在进行...');
+        }
+    };
 }
 
 // 验证交易对格式
@@ -234,11 +340,19 @@ function validateSymbol(symbol) {
     return true;
 }
 
-// 更新进度
-function updateProgress(percentage, status) {
+// 更新下载进度
+function updateDownloadProgress(percentage, status) {
+    console.log('updateDownloadProgress 被调用:', percentage, status);
+    
     const statusText = document.getElementById('fetch-status');
     const percentageText = document.getElementById('fetch-percentage');
     const progressBar = document.getElementById('fetch-progress-bar');
+    
+    console.log('元素查找结果:', {
+        statusText: !!statusText,
+        percentageText: !!percentageText,
+        progressBar: !!progressBar
+    });
     
     if (statusText) statusText.textContent = status;
     if (percentageText) percentageText.textContent = `${percentage}%`;

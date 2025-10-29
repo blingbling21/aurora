@@ -120,7 +120,7 @@ async fn test_kline_processing() -> Result<()> {
         },
     ];
 
-    let result = engine.run(&klines).await;
+    let result = engine.run(&klines, None).await;
     assert!(result.is_ok());
 
     // 验证权益曲线已更新
@@ -356,7 +356,7 @@ async fn test_backtest_result_correctness() -> Result<()> {
         },
     ];
 
-    let result = engine.run(&klines).await;
+    let result = engine.run(&klines, None).await;
     assert!(result.is_ok());
 
     // 验证有交易发生

@@ -1,14 +1,15 @@
-// Aurora Web - 交易点位图表可视化（使用 Lightweight Charts）
+// Aurora Web - 交易点位图表可视化（使用 Lightweight Charts）增强版
 
 let tradingChart = null;
 let candlestickSeries = null;
+let lineSeries = null;  // 用于绘制交易连线
 let buyMarkers = [];
 let sellMarkers = [];
 
 /**
- * 渲染交易点位图
+ * 渲染交易点位图（增强版）
  * @param {Array} klineData - K线数据 [{timestamp, open, high, low, close, volume}]
- * @param {Array} trades - 交易记录 [{timestamp, price, quantity, is_buy}]
+ * @param {Array} trades - 交易记录 [{timestamp, price, quantity, is_buy, pnl}]
  */
 function renderTradingChart(klineData, trades) {
     const container = document.getElementById('trading-chart');
@@ -44,6 +45,16 @@ function renderTradingChart(klineData, trades) {
         },
         crosshair: {
             mode: LightweightCharts.CrosshairMode.Normal,
+            vertLine: {
+                width: 1,
+                color: '#758696',
+                style: LightweightCharts.LineStyle.Dashed,
+            },
+            horzLine: {
+                width: 1,
+                color: '#758696',
+                style: LightweightCharts.LineStyle.Dashed,
+            },
         },
         rightPriceScale: {
             borderColor: '#e0e0e0',
@@ -77,8 +88,19 @@ function renderTradingChart(klineData, trades) {
     // 设置K线数据
     candlestickSeries.setData(formattedKlines);
 
-    // 如果有交易数据，添加标记
+    // 如果有交易数据，添加标记和连线
     if (trades && trades.length > 0) {
+        // 配对交易（买入和卖出）
+        const tradePairs = pairTrades(trades);
+        
+        // 为每个交易对添加连线
+        tradePairs.forEach(pair => {
+            if (pair.buy && pair.sell) {
+                addTradeLine(pair.buy, pair.sell, pair.pnl);
+            }
+        });
+        
+        // 添加交易标记
         const markers = trades.map(trade => {
             const isBuy = trade.is_buy;
             return {
@@ -86,13 +108,13 @@ function renderTradingChart(klineData, trades) {
                 position: isBuy ? 'belowBar' : 'aboveBar',
                 color: isBuy ? '#10b981' : '#ef4444',
                 shape: isBuy ? 'arrowUp' : 'arrowDown',
-                text: isBuy ? `买入 @${trade.price.toFixed(2)}` : `卖出 @${trade.price.toFixed(2)}`,
+                text: isBuy ? `买 $${trade.price.toFixed(2)}` : `卖 $${trade.price.toFixed(2)}`,
                 size: 1,
             };
         });
 
         candlestickSeries.setMarkers(markers);
-        console.log('添加交易标记:', markers.length);
+        console.log('添加交易标记:', markers.length, '交易对:', tradePairs.length);
     }
 
     // 自适应时间范围
@@ -108,7 +130,96 @@ function renderTradingChart(klineData, trades) {
 
     resizeObserver.observe(container);
 
+    // 保存到全局变量供联动使用
+    window.tradingChart = tradingChart;
+
     console.log('交易图表渲染完成，K线数:', klineData.length, '交易数:', trades ? trades.length : 0);
+}
+
+/**
+ * 配对买入和卖出交易
+ * @param {Array} trades - 交易记录
+ * @returns {Array} 交易对数组
+ */
+function pairTrades(trades) {
+    const pairs = [];
+    let openBuys = [];
+    
+    trades.forEach(trade => {
+        if (trade.is_buy) {
+            // 买入交易，加入待配对列表
+            openBuys.push(trade);
+        } else {
+            // 卖出交易，与最早的买入配对
+            if (openBuys.length > 0) {
+                const buyTrade = openBuys.shift();
+                const pnl = (trade.price - buyTrade.price) * Math.min(trade.quantity, buyTrade.quantity);
+                
+                pairs.push({
+                    buy: buyTrade,
+                    sell: trade,
+                    pnl: pnl
+                });
+            } else {
+                // 没有对应的买入（可能是做空交易）
+                pairs.push({
+                    buy: null,
+                    sell: trade,
+                    pnl: 0
+                });
+            }
+        }
+    });
+    
+    // 处理未配对的买入
+    openBuys.forEach(buyTrade => {
+        pairs.push({
+            buy: buyTrade,
+            sell: null,
+            pnl: 0
+        });
+    });
+    
+    return pairs;
+}
+
+/**
+ * 添加交易连线
+ * @param {Object} buyTrade - 买入交易
+ * @param {Object} sellTrade - 卖出交易
+ * @param {number} pnl - 盈亏
+ */
+function addTradeLine(buyTrade, sellTrade, pnl) {
+    if (!tradingChart || !buyTrade || !sellTrade) {
+        return;
+    }
+    
+    // 使用 LineSeries 来绘制连线
+    const lineData = [
+        {
+            time: Math.floor(buyTrade.timestamp / 1000),
+            value: buyTrade.price
+        },
+        {
+            time: Math.floor(sellTrade.timestamp / 1000),
+            value: sellTrade.price
+        }
+    ];
+    
+    // 根据盈亏决定颜色
+    const lineColor = pnl >= 0 ? '#10b981' : '#ef4444';
+    const lineWidth = Math.abs(pnl) > 100 ? 2 : 1;  // 大额盈亏用更粗的线
+    
+    const lineSeries = tradingChart.addLineSeries({
+        color: lineColor,
+        lineWidth: lineWidth,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+    });
+    
+    lineSeries.setData(lineData);
 }
 
 /**

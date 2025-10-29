@@ -398,7 +398,7 @@ body {
     color: #991b1b;
 }
 
-/* 图表网格布局 */
+/* 图表网格布局（旧版，保留以兼容） */
 .charts-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -412,7 +412,56 @@ body {
     }
 }
 
-/* 图表容器 */
+/* 新的图表布局 - 主图+副图结构 */
+.charts-layout {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* 主图容器（K线图） */
+.chart-main-container {
+    width: 100%;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    padding: 20px;
+}
+
+.chart-section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+/* 副图网格（权益曲线和回撤曲线） */
+.charts-sub-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+
+@media (min-width: 1024px) {
+    .charts-sub-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* 副图容器 */
+.chart-sub-container {
+    height: 350px;
+    padding: 16px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    position: relative;
+}
+
+/* 图表容器（旧版） */
 .chart-container {
     height: 400px;
     padding: 16px;
@@ -468,16 +517,26 @@ body {
     color: var(--danger-color);
 }
 
-.result-metric-label {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-bottom: 4px;
+/* Y轴切换按钮样式 */
+.axis-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #475569;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
-.result-metric-value {
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--text-primary);
+.axis-btn.active {
+    background: #3b82f6;
+    color: #ffffff;
+    border-color: #3b82f6;
+}
+
+.axis-btn:hover:not(.active) {
+    background: #f1f5f9;
 }
 
 /* 通知 */

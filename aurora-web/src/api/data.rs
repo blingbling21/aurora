@@ -154,13 +154,13 @@ fn count_csv_records(path: &std::path::Path) -> Option<usize> {
         })
 }
 
-/// 获取历史数据
+/// 获取历史数据（异步任务）
 async fn fetch_historical_data(
     State(state): State<AppState>,
     Json(req): Json<FetchDataRequest>,
-) -> WebResult<Json<SuccessResponse<String>>> {
+) -> WebResult<Json<SuccessResponse<serde_json::Value>>> {
     info!(
-        "开始获取历史数据: {} {} {} ({} 到 {})",
+        "创建数据下载任务: {} {} {} ({} 到 {})",
         req.exchange, req.symbol, req.interval, req.start_date, req.end_date
     );
 
@@ -198,71 +198,110 @@ async fn fetch_historical_data(
         ));
     }
 
-    // 根据交易所选择合适的下载器
-    match req.exchange.to_lowercase().as_str() {
-        "binance" => {
-            // 使用 Binance 下载器
-            use aurora_data::BinanceHistoricalDownloader;
-
-            info!("使用 Binance 下载器获取数据");
-            let downloader = BinanceHistoricalDownloader::new();
-
-            // 执行下载
-            downloader
-                .download_klines(
-                    &req.symbol.to_uppercase(),
-                    &req.interval,
-                    start_timestamp,
-                    end_timestamp,
-                    file_path.to_str().unwrap(),
-                )
-                .await
-                .map_err(|e| {
-                    warn!("数据下载失败: {}", e);
-                    
-                    // 提供更友好的错误消息
-                    let error_msg = e.to_string();
-                    if error_msg.contains("Invalid symbol") {
-                        WebError::InvalidRequest(format!(
-                            "交易对 '{}' 无效。请检查拼写，常见格式示例: BTCUSDT, ETHUSDT, BNBUSDT",
-                            req.symbol
-                        ))
-                    } else if error_msg.contains("network") || error_msg.contains("Network") {
-                        WebError::DataError(format!(
-                            "网络连接失败，请检查网络连接后重试。详细错误: {}",
-                            error_msg
-                        ))
-                    } else if error_msg.contains("timeout") || error_msg.contains("Timeout") {
-                        WebError::DataError(format!(
-                            "请求超时，可能是网络不稳定或数据量过大。建议缩小日期范围后重试。"
-                        ))
-                    } else {
-                        WebError::DataError(format!("数据下载失败: {}", e))
-                    }
-                })?;
-
-            info!("数据已成功下载到: {}", filename);
-            
-            // 读取下载的文件以获取实际的行数
-            let record_count = count_csv_records(&file_path).unwrap_or(0);
-            
-            Ok(Json(SuccessResponse::new(format!(
-                "成功下载 {} 条K线数据到文件: {}",
-                record_count, filename
-            ))))
-        }
-        "okx" | "bybit" | "coinbase" => {
-            // 其他交易所暂未实现
-            Err(WebError::InvalidRequest(format!(
-                "交易所 {} 暂未支持，目前仅支持 Binance",
-                req.exchange
-            )))
-        }
-        _ => Err(WebError::InvalidRequest(format!(
-            "不支持的交易所: {}",
+    // 只支持 Binance
+    if req.exchange.to_lowercase() != "binance" {
+        return Err(WebError::InvalidRequest(format!(
+            "交易所 {} 暂未支持，目前仅支持 Binance",
             req.exchange
-        ))),
+        )));
     }
+
+    // 创建下载任务
+    use crate::state::DownloadTask;
+    let task = DownloadTask::new(
+        req.exchange.clone(),
+        req.symbol.to_uppercase(),
+        req.interval.clone(),
+        req.start_date.clone(),
+        req.end_date.clone(),
+        filename.clone(),
+    );
+    let task_id = task.id;
+
+    // 将任务添加到状态管理
+    {
+        let mut tasks = state.download_tasks.write().await;
+        tasks.insert(task_id, task.clone());
+    }
+
+    // 克隆需要的变量
+    let state_clone = state.clone();
+    let symbol = req.symbol.to_uppercase();
+    let interval = req.interval.clone();
+    let file_path_str = file_path.to_string_lossy().to_string();
+    let filename_clone = filename.clone();
+
+    // 在后台执行下载任务
+    tokio::spawn(async move {
+        use aurora_data::BinanceHistoricalDownloader;
+
+        // 标记任务开始
+        {
+            let mut tasks = state_clone.download_tasks.write().await;
+            if let Some(task) = tasks.get_mut(&task_id) {
+                task.start();
+            }
+        }
+
+        info!("开始下载任务 {}: {} {} {}", task_id, symbol, interval, filename_clone);
+
+        let downloader = BinanceHistoricalDownloader::new();
+
+        // 执行下载，带进度回调
+        let result = downloader
+            .download_klines_with_progress(
+                &symbol,
+                &interval,
+                start_timestamp,
+                end_timestamp,
+                &file_path_str,
+                Some(|downloaded_count, estimated_total| {
+                    // 异步更新任务进度
+                    let state_clone2 = state_clone.clone();
+                    let task_id_clone = task_id;
+                    tokio::spawn(async move {
+                        let mut tasks = state_clone2.download_tasks.write().await;
+                        if let Some(task) = tasks.get_mut(&task_id_clone) {
+                            let message = if let Some(total) = estimated_total {
+                                format!("已获取 {} / {} 条数据", downloaded_count, total)
+                            } else {
+                                format!("已获取 {} 条数据", downloaded_count)
+                            };
+                            task.update_progress(downloaded_count, estimated_total, message);
+                        }
+                    });
+                }),
+            )
+            .await;
+
+        // 更新任务状态
+        {
+            let mut tasks = state_clone.download_tasks.write().await;
+            if let Some(task) = tasks.get_mut(&task_id) {
+                match result {
+                    Ok(_) => {
+                        // 获取实际下载的数据条数
+                        let record_count = count_csv_records(&std::path::PathBuf::from(&file_path_str))
+                            .unwrap_or(task.downloaded_count);
+                        task.complete(record_count);
+                        info!("下载任务 {} 完成: {} 条数据", task_id, record_count);
+                    }
+                    Err(e) => {
+                        let error_msg = format!("下载失败: {}", e);
+                        task.fail(error_msg.clone());
+                        warn!("下载任务 {} 失败: {}", task_id, error_msg);
+                    }
+                }
+            }
+        }
+    });
+
+    // 立即返回任务ID
+    Ok(Json(SuccessResponse::new(serde_json::json!({
+        "task_id": task_id.to_string(),
+        "message": "数据下载任务已创建",
+        "filename": filename
+    }))))
 }
 
 /// 将日期字符串（YYYY-MM-DD）转换为 Unix 时间戳（毫秒）

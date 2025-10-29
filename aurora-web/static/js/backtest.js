@@ -157,7 +157,7 @@ function handleWebSocketMessage(data) {
             break;
             
         case 'status_update':
-            updateProgress(data);
+            updateBacktestProgress(data);
             break;
             
         case 'final':
@@ -170,8 +170,8 @@ function handleWebSocketMessage(data) {
     }
 }
 
-// 更新进度
-function updateProgress(data) {
+// 更新回测进度
+function updateBacktestProgress(data) {
     const progress = data.progress || 0;
     const status = data.status;
     

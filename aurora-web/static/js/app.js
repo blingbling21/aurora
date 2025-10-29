@@ -377,6 +377,10 @@ function displayTaskResult(taskId, resultData) {
             console.log('找到基准数据，数据点:', benchmarkCurve.length);
         }
         
+        // 保存当前数据供Y轴切换使用
+        window.currentEquityCurve = equityCurve;
+        window.currentBenchmarkCurve = benchmarkCurve;
+        
         renderEquityCurve(equityCurve, benchmarkCurve);
         renderDrawdownCurve(equityCurve);
         
@@ -385,6 +389,16 @@ function displayTaskResult(taskId, resultData) {
             // 假设数据路径存储在结果中（需要在后端添加）
             const dataPath = result.data_path || '数据路径未知';
             loadAndRenderTradingChart(dataPath, trades);
+        }
+        
+        // 初始化图表联动功能
+        if (typeof initChartSync === 'function') {
+            initChartSync();
+        }
+        
+        // 添加联动控制按钮
+        if (typeof addChartSyncToggle === 'function') {
+            addChartSyncToggle();
         }
     } else {
         console.warn('没有权益曲线数据');
