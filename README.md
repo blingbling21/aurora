@@ -305,7 +305,7 @@ let initial_cash = config.portfolio.initial_cash;
 - **历史记录**：查看所有回测任务历史
 
 **技术栈**：
-- 后端：Actix-Web 4.9 + Tokio (异步Rust Web框架)
+- 后端：Axum + Tokio (异步Rust Web框架)
 - 前端：HTML5 + CSS3 + Vanilla JS (轻量级单页应用)
 - 可视化：Chart.js 4.4 (权益曲线、回撤曲线等)
 - 通信：RESTful API + WebSocket (实时双向通信)
