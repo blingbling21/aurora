@@ -20,6 +20,29 @@ export * from './schemas';
 // 导出验证函数
 export * from './validators';
 
+// 导出 API 类型（避免命名冲突，仅导出类型）
+export type {
+  ApiResponse,
+  ConfigListItem,
+  CreateConfigRequest,
+  UpdateConfigRequest,
+  ConfigValidateResponse,
+  DataFileItem,
+  FetchDataRequest,
+  Kline,
+  TaskStatus as ApiTaskStatus,
+  BacktestTask as ApiBacktestTask,
+  StartBacktestRequest,
+  BacktestMetrics as ApiBacktestMetrics,
+  EquityPoint,
+  Trade as ApiTrade,
+  BacktestResult as ApiBacktestResult,
+  FullBacktestResult,
+  WsMessageType,
+  WsMessage,
+  DashboardStats,
+} from './api';
+
 // 为了向后兼容，保留原有的导出方式
 export type {
   TaskStatus,

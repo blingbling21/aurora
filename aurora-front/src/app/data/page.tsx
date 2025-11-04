@@ -17,7 +17,18 @@
 'use client';
 
 import { useState } from 'react';
-import { PageHeader, Button, Card } from '@/components/ui';
+import {
+  PageHeader,
+  Button,
+  Card,
+  Input,
+  DatePicker,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui';
 import { DataFile } from '@/types';
 import { EXCHANGE_OPTIONS, INTERVAL_OPTIONS, SYMBOL_OPTIONS } from '@/constants';
 
@@ -31,18 +42,20 @@ export default function DataPage() {
   const [dataFiles] = useState<DataFile[]>([]);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [startDate, setStartDate] = useState<Date>();
+  const [endDate, setEndDate] = useState<Date>();
 
   return (
     <div>
       {/* 页面头部 */}
       <PageHeader
-        icon="📁"
+        icon="�"
         title="数据管理"
         description="管理和下载历史市场数据"
       />
 
       {/* 数据下载表单 */}
-      <Card title="📥 下载历史数据">
+      <Card title="下载数据">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -58,17 +71,18 @@ export default function DataPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 交易所:
               </label>
-              <select
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">-- 请选择 --</option>
-                {EXCHANGE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              <Select required>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="-- 请选择 --" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EXCHANGE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -76,19 +90,23 @@ export default function DataPage() {
                 交易对:
               </label>
               <div className="flex gap-2">
-                <select className="flex-1 px-3 py-2 border border-gray-300 rounded-md">
-                  <option value="">-- 选择或手动输入 --</option>
-                  {SYMBOL_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <input
+                <Select>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="-- 选择或手动输入 --" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SYMBOL_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
                   type="text"
                   required
                   placeholder="例如: BTCUSDT"
-                  className="flex-2 px-3 py-2 border border-gray-300 rounded-md uppercase"
+                  className="flex-2 uppercase"
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">
@@ -100,17 +118,18 @@ export default function DataPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 时间周期:
               </label>
-              <select
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">-- 请选择 --</option>
-                {INTERVAL_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              <Select required>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="-- 请选择 --" />
+                </SelectTrigger>
+                <SelectContent>
+                  {INTERVAL_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -119,10 +138,12 @@ export default function DataPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 开始日期:
               </label>
-              <input
-                type="date"
+              <DatePicker
+                date={startDate}
+                onDateChange={setStartDate}
+                placeholder="选择开始日期"
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full"
               />
             </div>
 
@@ -130,10 +151,12 @@ export default function DataPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 结束日期:
               </label>
-              <input
-                type="date"
+              <DatePicker
+                date={endDate}
+                onDateChange={setEndDate}
+                placeholder="选择结束日期"
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full"
               />
             </div>
 
@@ -141,17 +164,17 @@ export default function DataPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 保存文件名:
               </label>
-              <input
+              <Input
                 type="text"
                 placeholder="自动生成"
                 readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                className="w-full bg-gray-50"
               />
             </div>
           </div>
 
           <div className="flex gap-3">
-            <Button type="submit">📥 下载数据</Button>
+            <Button type="submit">📥 开始下载</Button>
             <Button type="button" variant="secondary">
               👁️ 预览文件名
             </Button>

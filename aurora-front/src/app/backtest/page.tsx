@@ -17,7 +17,16 @@
 'use client';
 
 import { useState } from 'react';
-import { PageHeader, Button, Card } from '@/components/ui';
+import {
+  PageHeader,
+  Button,
+  Card,
+  Input,
+  Select,
+  SelectContent,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui';
 
 /**
  * 回测执行页面
@@ -39,8 +48,9 @@ export default function BacktestPage() {
         description="配置并启动新的回测任务"
       />
 
-      {/* 启动回测表单 */}
-      <Card title="启动新回测">
+      <div className="grid grid-cols-1 gap-6">
+        {/* 启动回测表单 */}
+        <Card title="任务配置">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -55,13 +65,13 @@ export default function BacktestPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               任务名称:
             </label>
-            <input
+            <Input
               type="text"
               required
               placeholder="例如: BTC MA交叉策略测试"
               value={taskName}
               onChange={(e) => setTaskName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full"
             />
           </div>
 
@@ -69,35 +79,52 @@ export default function BacktestPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               选择配置文件:
             </label>
-            <select
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">-- 请选择 --</option>
-              {/* 后续从 API 加载配置列表 */}
-            </select>
+            <Select required>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="-- 请选择 --" />
+              </SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-6 text-center text-sm text-gray-500">
+                  暂无配置文件，请先创建配置
+                </div>
+                {/* 后续从 API 加载配置列表 */}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               选择数据文件:
             </label>
-            <select
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">-- 请选择 --</option>
-              {/* 后续从 API 加载数据文件列表 */}
-            </select>
+            <Select required>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="-- 请选择 --" />
+              </SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-6 text-center text-sm text-gray-500">
+                  暂无数据文件，请先下载数据
+                </div>
+                {/* 后续从 API 加载数据文件列表 */}
+              </SelectContent>
+            </Select>
           </div>
 
-          <Button type="submit">🚀 启动回测</Button>
+          <div className="flex gap-3">
+            <Button type="submit">🚀 开始回测</Button>
+            <Button type="button" variant="secondary" disabled={!isRunning}>
+              ⏹️ 停止
+            </Button>
+          </div>
         </form>
       </Card>
 
-      {/* 回测进度 */}
-      {isRunning && (
-        <Card title="回测进度" className="mt-6">
+      {/* 执行结果 */}
+      <Card title="执行结果" className="mt-6">
+        {!isRunning ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 mb-4">点击&ldquo;开始回测&rdquo;按钮启动任务</p>
+          </div>
+        ) : (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-700">
@@ -134,8 +161,9 @@ export default function BacktestPage() {
               查看结果
             </Button>
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
+      </div>
     </div>
   );
 }

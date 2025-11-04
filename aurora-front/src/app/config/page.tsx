@@ -17,7 +17,18 @@
 'use client';
 
 import { useState } from 'react';
-import { PageHeader, Button, Card } from '@/components/ui';
+import {
+  PageHeader,
+  Button,
+  Card,
+  Input,
+  Textarea,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui';
 import { ConfigFile } from '@/types';
 
 /**
@@ -38,12 +49,16 @@ export default function ConfigPage() {
         icon="⚙️"
         title="配置管理"
         action={
-          <Button onClick={() => setIsEditing(true)}>+ 新建配置</Button>
+          <div className="flex gap-3">
+            <Button onClick={() => setIsEditing(true)}>+ 新建配置</Button>
+            <Button variant="secondary">🔄 刷新</Button>
+          </div>
         }
       />
 
-      {/* 配置文件列表 */}
-      <Card title="配置文件列表">
+      <div className="grid grid-cols-1 gap-6">
+        {/* 配置文件列表 */}
+        <Card title="配置列表">
         {configs.length === 0 ? (
           <p className="text-gray-500 text-center py-8">暂无配置文件</p>
         ) : (
@@ -70,144 +85,160 @@ export default function ConfigPage() {
       </Card>
 
       {/* 配置编辑器 */}
-      {isEditing && (
-        <Card title="编辑配置" className="mt-6">
-          <div className="mb-4 flex gap-3">
-            <input
-              type="file"
-              accept=".toml"
-              className="hidden"
-              id="config-import"
-            />
-            <Button
-              variant="secondary"
-              onClick={() => document.getElementById('config-import')?.click()}
-            >
-              📁 导入 TOML
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setEditMode(editMode === 'form' ? 'text' : 'form')}
-            >
-              🔄 切换模式
-            </Button>
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              文件名:
-            </label>
-            <input
-              type="text"
-              placeholder="example.toml"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {editMode === 'form' ? (
-            <div className="space-y-6">
-              {/* 表单模式 - 后续会添加详细的表单字段 */}
-              <div>
-                <h4 className="text-base font-semibold text-blue-500 mb-3 pb-2 border-b">
-                  数据源配置
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      数据提供商:
-                    </label>
-                    <select className="w-full px-3 py-2 border border-gray-300 rounded-md">
-                      <option value="binance">Binance</option>
-                      <option value="okx">OKX</option>
-                      <option value="bybit">Bybit</option>
-                      <option value="csv">CSV File</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      超时时间 (秒):
-                    </label>
-                    <input
-                      type="number"
-                      defaultValue={30}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      最大重试次数:
-                    </label>
-                    <input
-                      type="number"
-                      defaultValue={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-base font-semibold text-blue-500 mb-3 pb-2 border-b">
-                  投资组合配置
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      初始资金:
-                    </label>
-                    <input
-                      type="number"
-                      defaultValue={10000}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      手续费率 (%):
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      defaultValue={0.1}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      滑点 (%):
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      defaultValue={0.05}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                </div>
-              </div>
+      <Card title="配置编辑器" className="mt-6">
+        {!isEditing ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 mb-4">选择或创建一个配置文件以开始编辑</p>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => setIsEditing(true)}>+ 新建配置</Button>
+              <Button variant="secondary">📁 导入配置</Button>
             </div>
-          ) : (
-            <div>
+          </div>
+        ) : (
+          <>
+            <div className="mb-4 flex gap-3">
+              <input
+                type="file"
+                accept=".toml"
+                className="hidden"
+                id="config-import"
+              />
+              <Button
+                variant="secondary"
+                onClick={() => document.getElementById('config-import')?.click()}
+              >
+                📁 导入 TOML
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setEditMode(editMode === 'form' ? 'text' : 'form')}
+              >
+                {editMode === 'form' ? '📝 文本模式' : '📋 表单模式'}
+              </Button>
+            </div>
+
+            <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                配置内容 (TOML):
+                文件名:
               </label>
-              <textarea
-                rows={20}
-                placeholder="在此输入TOML配置..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm"
+              <Input
+                type="text"
+                placeholder="example.toml"
+                className="w-full"
               />
             </div>
-          )}
 
-          <div className="mt-6 flex gap-3">
-            <Button>💾 保存</Button>
-            <Button variant="secondary">✓ 验证</Button>
-            <Button variant="secondary" onClick={() => setIsEditing(false)}>
-              ✕ 取消
-            </Button>
-          </div>
-        </Card>
-      )}
+            {editMode === 'form' ? (
+              <div className="space-y-6">
+                {/* 表单模式 - 后续会添加详细的表单字段 */}
+                <div>
+                  <h4 className="text-base font-semibold text-blue-500 mb-3 pb-2 border-b">
+                    数据源配置
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        数据提供商:
+                      </label>
+                      <Select defaultValue="binance">
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="binance">Binance</SelectItem>
+                          <SelectItem value="okx">OKX</SelectItem>
+                          <SelectItem value="bybit">Bybit</SelectItem>
+                          <SelectItem value="csv">CSV File</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        超时时间 (秒):
+                      </label>
+                      <Input
+                        type="number"
+                        defaultValue={30}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        最大重试次数:
+                      </label>
+                      <Input
+                        type="number"
+                        defaultValue={3}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-base font-semibold text-blue-500 mb-3 pb-2 border-b">
+                    投资组合配置
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        初始资金:
+                      </label>
+                      <Input
+                        type="number"
+                        defaultValue={10000}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        手续费率 (%):
+                      </label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        defaultValue={0.1}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        滑点 (%):
+                      </label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        defaultValue={0.05}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  配置内容 (TOML):
+                </label>
+                <Textarea
+                  rows={20}
+                  placeholder="在此输入TOML配置..."
+                  className="w-full font-mono text-sm"
+                />
+              </div>
+            )}
+
+            <div className="mt-6 flex gap-3">
+              <Button>💾 保存</Button>
+              <Button variant="secondary">✓ 验证</Button>
+              <Button variant="secondary" onClick={() => setIsEditing(false)}>
+                ✕ 取消
+              </Button>
+            </div>
+          </>
+        )}
+      </Card>
+      </div>
     </div>
   );
 }

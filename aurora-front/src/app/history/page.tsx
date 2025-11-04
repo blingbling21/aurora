@@ -40,8 +40,9 @@ export default function HistoryPage() {
         action={<Button variant="secondary">🔄 刷新</Button>}
       />
 
-      {/* 回测历史列表 */}
-      <Card title="回测历史">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* 回测历史列表 */}
+        <Card title="回测历史">
         {tasks.length === 0 ? (
           <p className="text-gray-500 text-center py-8">暂无历史记录</p>
         ) : (
@@ -60,12 +61,16 @@ export default function HistoryPage() {
         )}
       </Card>
 
-      {/* 回测结果查看器 */}
-      {selectedResult && (
-        <Card title="回测结果" className="mt-6">
-          <div className="space-y-6">
-            {/* 结果摘要 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        {/* 回测结果查看器 */}
+        <Card title="结果详情" className="lg:col-span-2">
+          {!selectedResult ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 mb-4">选择一个任务查看详细结果</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* 结果摘要 */}
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <p className="text-xs text-gray-500 mb-2 font-medium">总收益率</p>
                 <p
@@ -119,42 +124,43 @@ export default function HistoryPage() {
                   {selectedResult.metrics.winRate.toFixed(2)}%
                 </p>
               </div>
-            </div>
-
-            {/* 图表展示区域 - 后续添加图表组件 */}
-            <div className="space-y-6">
-              <div className="p-6 bg-white rounded-lg border border-gray-200">
-                <h4 className="text-base font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">
-                  价格走势与交易点位
-                </h4>
-                <div className="h-[500px] flex items-center justify-center text-gray-400">
-                  图表组件 - 待实现
-                </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="p-4 bg-white rounded-lg border border-gray-200">
-                  <h5 className="text-sm font-semibold text-gray-900 mb-3">
-                    权益曲线
-                  </h5>
-                  <div className="h-[350px] flex items-center justify-center text-gray-400">
+              {/* 图表展示区域 - 后续添加图表组件 */}
+              <div className="space-y-6">
+                <div className="p-6 bg-white rounded-lg border border-gray-200">
+                  <h4 className="text-base font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">
+                    价格走势与交易点位
+                  </h4>
+                  <div className="h-[500px] flex items-center justify-center text-gray-400">
                     图表组件 - 待实现
                   </div>
                 </div>
 
-                <div className="p-4 bg-white rounded-lg border border-gray-200">
-                  <h5 className="text-sm font-semibold text-gray-900 mb-3">
-                    回撤曲线
-                  </h5>
-                  <div className="h-[350px] flex items-center justify-center text-gray-400">
-                    图表组件 - 待实现
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="p-4 bg-white rounded-lg border border-gray-200">
+                    <h5 className="text-sm font-semibold text-gray-900 mb-3">
+                      权益曲线
+                    </h5>
+                    <div className="h-[350px] flex items-center justify-center text-gray-400">
+                      图表组件 - 待实现
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-white rounded-lg border border-gray-200">
+                    <h5 className="text-sm font-semibold text-gray-900 mb-3">
+                      回撤曲线
+                    </h5>
+                    <div className="h-[350px] flex items-center justify-center text-gray-400">
+                      图表组件 - 待实现
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </Card>
-      )}
+      </div>
     </div>
   );
 }

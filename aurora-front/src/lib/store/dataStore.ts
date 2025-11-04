@@ -130,7 +130,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   completeDownload: () =>
     set({
       isDownloading: false,
-      downloadProgress: 100,
+      downloadProgress: 0,
       currentDownloadFile: null,
     }),
 

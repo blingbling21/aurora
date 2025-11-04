@@ -87,30 +87,26 @@ export const useNotificationStore = create<NotificationState>((set) => ({
   clearNotifications: () => set({ notifications: [] }),
 
   // 显示成功通知
-  showSuccess: (message, duration) =>
-    set((state) => {
-      state.addNotification({ type: 'success', message, duration });
-      return state;
-    }),
+  showSuccess: (message, duration) => {
+    const { addNotification } = useNotificationStore.getState();
+    addNotification({ type: 'success', message, duration });
+  },
 
   // 显示错误通知
-  showError: (message, duration) =>
-    set((state) => {
-      state.addNotification({ type: 'error', message, duration });
-      return state;
-    }),
+  showError: (message, duration) => {
+    const { addNotification } = useNotificationStore.getState();
+    addNotification({ type: 'error', message, duration });
+  },
 
   // 显示信息通知
-  showInfo: (message, duration) =>
-    set((state) => {
-      state.addNotification({ type: 'info', message, duration });
-      return state;
-    }),
+  showInfo: (message, duration) => {
+    const { addNotification } = useNotificationStore.getState();
+    addNotification({ type: 'info', message, duration });
+  },
 
   // 显示警告通知
-  showWarning: (message, duration) =>
-    set((state) => {
-      state.addNotification({ type: 'warning', message, duration });
-      return state;
-    }),
+  showWarning: (message, duration) => {
+    const { addNotification } = useNotificationStore.getState();
+    addNotification({ type: 'warning', message, duration });
+  },
 }));
