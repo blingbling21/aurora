@@ -1,20 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Aurora Front - 量化交易回测平台前端
 
-## Getting Started
+基于 Next.js 16 的现代化量化交易回测平台前端应用。
 
-First, run the development server:
+## 架构说明
+
+Aurora 采用前后端分离架构：
+
+- **前端 (aurora-front)**: Next.js + React - 运行在 localhost:3000
+- **后端 (aurora-web)**: Rust + Axum - 运行在 localhost:8080
+
+⚠️ **重要**: 前端通过代理访问后端 API，需要同时启动前后端服务。
+
+## 快速开始
+
+### 1. 启动后端服务器
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd ../aurora-web
+cargo run
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+后端将在 `http://localhost:8080` 启动
+
+### 2. 启动前端开发服务器
+
+```bash
+npm install  # 首次运行需要安装依赖
+npm run dev
+```
+
+前端将在 `http://localhost:3000` 启动
+
+### 3. 访问应用
+
+打开浏览器访问 [http://localhost:3000](http://localhost:3000)
+
+## API 配置
+
+前端通过环境变量和 Next.js 代理访问后端 API：
+
+- **开发环境**: 使用 Next.js rewrites 代理到 `http://localhost:8080/api`
+- **生产环境**: 通过 `NEXT_PUBLIC_API_BASE_URL` 环境变量配置
+
+详细配置说明请参考: [API_CONFIGURATION.md](./docs/API_CONFIGURATION.md)
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

@@ -58,22 +58,54 @@ export function Notification({ notification, onClose }: NotificationProps) {
     return () => clearTimeout(timer);
   }, [notification, onClose]);
 
+  // 图标映射
+  const icons = {
+    success: '✓',
+    error: '✕',
+    info: 'ℹ',
+    warning: '⚠',
+  };
+
+  // 图标颜色映射
+  const iconColors = {
+    success: 'text-green-600',
+    error: 'text-red-600',
+    info: 'text-blue-600',
+    warning: 'text-yellow-600',
+  };
+
   return (
     <div
       className={cn(
-        'fixed top-6 right-6 min-w-[300px] bg-white rounded-lg shadow-lg border-l-4 p-4 transition-transform duration-300 z-50',
+        'min-w-[320px] max-w-md bg-white rounded-lg shadow-xl border-l-4 p-4 transition-all duration-300',
         typeStyles[notification.type],
-        isVisible ? 'translate-x-0' : 'translate-x-[400px]'
+        isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full'
       )}
     >
-      <div className="flex items-start justify-between">
-        <p className="text-sm text-gray-900">{notification.message}</p>
+      <div className="flex items-start gap-3">
+        {/* 图标 */}
+        <div
+          className={cn(
+            'shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-bold',
+            iconColors[notification.type]
+          )}
+        >
+          {icons[notification.type]}
+        </div>
+
+        {/* 消息内容 */}
+        <p className="flex-1 text-sm text-gray-900 wrap-break-word">
+          {notification.message}
+        </p>
+
+        {/* 关闭按钮 */}
         <button
           onClick={() => {
             setIsVisible(false);
             setTimeout(() => onClose(notification.id), 300);
           }}
-          className="ml-4 text-gray-400 hover:text-gray-600"
+          className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+          aria-label="关闭通知"
         >
           ✕
         </button>
@@ -85,26 +117,42 @@ export function Notification({ notification, onClose }: NotificationProps) {
 /**
  * 通知容器组件
  * 
- * 管理和显示多个通知
+ * 管理和显示多个通知，连接到 zustand store
  */
 export function NotificationContainer() {
+  // 从 zustand store 获取通知列表和移除方法
+  // 使用动态导入避免在测试中出现问题
   const [notifications, setNotifications] = useState<NotificationType[]>([]);
+  const [removeNotification, setRemoveNotification] = useState<((id: string) => void) | null>(null);
 
-  // 移除通知
-  const removeNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  };
+  useEffect(() => {
+    // 动态导入 store
+    import('@/lib/store').then(({ useNotificationStore }) => {
+      const store = useNotificationStore.getState();
+      setNotifications(store.notifications);
+      setRemoveNotification(() => store.removeNotification);
+
+      // 订阅 store 变化
+      const unsubscribe = useNotificationStore.subscribe((state) => {
+        setNotifications(state.notifications);
+        setRemoveNotification(() => state.removeNotification);
+      });
+
+      return () => unsubscribe();
+    });
+  }, []);
 
   return (
-    <div className="fixed top-0 right-0 z-50">
-      {notifications.map((notification, index) => (
-        <div key={notification.id} style={{ top: `${index * 80}px` }}>
+    <div className="fixed top-0 right-0 z-50 p-4">
+      <div className="flex flex-col gap-3">
+        {notifications.map((notification) => (
           <Notification
+            key={notification.id}
             notification={notification}
-            onClose={removeNotification}
+            onClose={removeNotification || (() => {})}
           />
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

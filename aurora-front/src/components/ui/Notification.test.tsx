@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { Notification } from './Notification';
@@ -173,10 +173,14 @@ describe('Notification 组件', () => {
     );
     
     // 快进到自动关闭时间
-    jest.advanceTimersByTime(3000);
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
     
     // 再快进动画时间
-    jest.advanceTimersByTime(300);
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
     
     expect(mockOnClose).toHaveBeenCalledWith('1');
   });
@@ -196,14 +200,20 @@ describe('Notification 组件', () => {
     );
     
     // 快进 3 秒，不应该关闭
-    jest.advanceTimersByTime(3000);
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
     expect(mockOnClose).not.toHaveBeenCalled();
     
     // 再快进 2 秒
-    jest.advanceTimersByTime(2000);
+    act(() => {
+      jest.advanceTimersByTime(2000);
+    });
     
     // 快进动画时间
-    jest.advanceTimersByTime(300);
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
     
     expect(mockOnClose).toHaveBeenCalledWith('1');
   });
@@ -224,27 +234,16 @@ describe('Notification 组件', () => {
     );
     
     // 快进默认时间
-    jest.advanceTimersByTime(3000);
-    jest.advanceTimersByTime(300);
+    act(() => {
+      jest.advanceTimersByTime(3000);
+      jest.advanceTimersByTime(300);
+    });
     
     expect(mockOnClose).toHaveBeenCalledWith('5');
   });
 
-  // 测试通知位置
-  it('应该固定在屏幕右上角', () => {
-    const { container } = render(
-      <Notification
-        notification={mockNotificationSuccess}
-        onClose={mockOnClose}
-      />
-    );
-    
-    const notification = container.firstChild as HTMLElement;
-    expect(notification).toHaveClass('fixed', 'top-6', 'right-6');
-  });
-
   // 测试通知宽度
-  it('应该有最小宽度限制', () => {
+  it('应该有最小和最大宽度限制', () => {
     const { container } = render(
       <Notification
         notification={mockNotificationSuccess}
@@ -253,7 +252,7 @@ describe('Notification 组件', () => {
     );
     
     const notification = container.firstChild as HTMLElement;
-    expect(notification).toHaveClass('min-w-[300px]');
+    expect(notification).toHaveClass('min-w-[320px]', 'max-w-md');
   });
 
   // 测试长消息
@@ -274,19 +273,6 @@ describe('Notification 组件', () => {
     expect(screen.getByText(longMessage)).toBeInTheDocument();
   });
 
-  // 测试 z-index
-  it('应该有足够高的 z-index', () => {
-    const { container } = render(
-      <Notification
-        notification={mockNotificationSuccess}
-        onClose={mockOnClose}
-      />
-    );
-    
-    const notification = container.firstChild as HTMLElement;
-    expect(notification).toHaveClass('z-50');
-  });
-
   // 测试样式类名
   it('应该包含所有必要的样式类名', () => {
     const { container } = render(
@@ -300,10 +286,10 @@ describe('Notification 组件', () => {
     expect(notification).toHaveClass(
       'bg-white',
       'rounded-lg',
-      'shadow-lg',
+      'shadow-xl',
       'border-l-4',
       'p-4',
-      'transition-transform',
+      'transition-all',
       'duration-300'
     );
   });

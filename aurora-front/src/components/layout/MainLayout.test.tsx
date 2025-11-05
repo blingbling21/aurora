@@ -24,6 +24,12 @@ jest.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
 }));
 
+// Mock NotificationContainer
+jest.mock('@/components/ui', () => ({
+  ...jest.requireActual('@/components/ui'),
+  NotificationContainer: () => <div data-testid="notification-container">NotificationContainer</div>,
+}));
+
 describe('MainLayout 组件', () => {
   // 每个测试前重置 mock
   beforeEach(() => {
@@ -142,19 +148,31 @@ describe('MainLayout 组件', () => {
     expect(firstChild.querySelector('h1')?.textContent).toBe('🌟 Aurora');
   });
 
-  // 测试主内容区域在布局中的位置
-  it('应该将主内容区域放在右侧', () => {
+  // 测试主内容区域在布局中
+  it('应该包含主内容区域', () => {
     const { container } = render(
       <MainLayout>
         <div className="test-content">测试内容</div>
       </MainLayout>
     );
     
-    const layout = container.firstChild as HTMLElement;
-    const lastChild = layout.lastChild as HTMLElement;
+    const mainContent = container.querySelector('main');
     
-    // 最后一个子元素应该是 main 标签
-    expect(lastChild.tagName).toBe('MAIN');
+    // 应该包含 main 标签
+    expect(mainContent).toBeInTheDocument();
+    expect(mainContent?.textContent).toContain('测试内容');
+  });
+
+  // 测试通知容器的存在
+  it('应该包含通知容器', () => {
+    render(
+      <MainLayout>
+        <div>内容</div>
+      </MainLayout>
+    );
+    
+    // 应该渲染通知容器
+    expect(screen.getByTestId('notification-container')).toBeInTheDocument();
   });
 
   // 测试空子元素

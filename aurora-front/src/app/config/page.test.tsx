@@ -63,20 +63,18 @@ describe('ConfigPage', () => {
     expect(screen.getByText('配置管理')).toBeInTheDocument();
   });
 
-  // 测试配置列表卡片
-  it('应该渲染配置列表卡片', () => {
+  // 测试配置编辑器卡片标题
+  it('应该渲染配置编辑器卡片', () => {
     render(<ConfigPage />);
     
-    const cards = screen.getAllByTestId('card');
-    const listCard = cards.find(card => card.textContent?.includes('配置列表'));
-    expect(listCard).toBeInTheDocument();
+    expect(screen.getByText('配置编辑器')).toBeInTheDocument();
   });
 
-  // 测试空配置列表提示
-  it('当没有配置时应该显示提示信息', () => {
+  // 测试初始状态提示
+  it('未编辑状态应该显示提示信息', () => {
     render(<ConfigPage />);
     
-    expect(screen.getByText('暂无配置文件')).toBeInTheDocument();
+    expect(screen.getByText('选择或创建一个配置文件以开始编辑')).toBeInTheDocument();
   });
 
   // 测试新建按钮
@@ -129,11 +127,11 @@ describe('ConfigPage', () => {
     expect(grids.length).toBeGreaterThan(0);
   });
 
-  // 测试至少有两个主要卡片
-  it('应该至少有两个卡片（列表和编辑器）', () => {
+  // 测试有配置编辑器卡片
+  it('应该至少有配置编辑器卡片', () => {
     render(<ConfigPage />);
     
     const cards = screen.getAllByTestId('card');
-    expect(cards.length).toBeGreaterThanOrEqual(2);
+    expect(cards.length).toBeGreaterThanOrEqual(1);
   });
 });

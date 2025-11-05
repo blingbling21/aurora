@@ -20,6 +20,9 @@ export * from './schemas';
 // 导出验证函数
 export * from './validators';
 
+// 导出配置相关的schema和类型
+export * from './config-schema';
+
 // 导出 API 类型（避免命名冲突，仅导出类型）
 export type {
   ApiResponse,

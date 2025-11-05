@@ -18,6 +18,7 @@
 
 import { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
+import { NotificationContainer } from '@/components/ui';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -26,7 +27,7 @@ interface MainLayoutProps {
 /**
  * 主布局组件
  * 
- * 提供应用的主要布局结构,包含侧边栏和主内容区域
+ * 提供应用的主要布局结构,包含侧边栏、主内容区域和通知容器
  * 
  * @param {ReactNode} children - 主内容区域的子组件
  */
@@ -40,6 +41,9 @@ export function MainLayout({ children }: MainLayoutProps) {
       <main className="flex-1 overflow-y-auto bg-gray-50 p-8">
         {children}
       </main>
+
+      {/* 全局通知容器 */}
+      <NotificationContainer />
     </div>
   );
 }

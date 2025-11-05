@@ -483,6 +483,11 @@
   resolved "https://registry.npmmirror.com/@humanwhocodes/retry/-/retry-0.4.3.tgz"
   integrity sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==
 
+"@iarna/toml@^2.2.5":
+  version "2.2.5"
+  resolved "https://registry.npmmirror.com/@iarna/toml/-/toml-2.2.5.tgz#b32366c89b43c6f8cefbdefac778b9c828e3ba8c"
+  integrity sha512-trnsAYxU3xnS1gPHPyU961coFyLkh4gAD/0zQ5mymY4yOZ+CYvsPqUbOFSw0aDM4y0tV7tiFxL/1XfXPNC6IPg==
+
 "@img/colour@^1.0.0":
   version "1.0.0"
   resolved "https://registry.npmmirror.com/@img/colour/-/colour-1.0.0.tgz"
@@ -1505,6 +1510,13 @@
   version "1.0.8"
   resolved "https://registry.npmmirror.com/@types/estree/-/estree-1.0.8.tgz"
   integrity sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==
+
+"@types/iarna__toml@^2.0.5":
+  version "2.0.5"
+  resolved "https://registry.npmmirror.com/@types/iarna__toml/-/iarna__toml-2.0.5.tgz#95f134b33c17abc15981e4b81b036c7e4238aa81"
+  integrity sha512-I55y+SxI0ayM4MBU6yfGJGmi4wRll6wtSeKiFYAZj+Z5Q1DVbMgBSVDYY+xQZbjIlLs/pN4fidnvR8faDrmxPg==
+  dependencies:
+    "@types/node" "*"
 
 "@types/istanbul-lib-coverage@*", "@types/istanbul-lib-coverage@^2.0.1", "@types/istanbul-lib-coverage@^2.0.6":
   version "2.0.6"
