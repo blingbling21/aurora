@@ -1,5 +1,3 @@
-# 测试 BidAsk 定价模式的配置文件
-
 [data_source]
 provider = "binance"
 timeout = 30
@@ -41,7 +39,6 @@ data_path = "btc_1h.csv"
 symbol = "BTCUSDT"
 interval = "1h"
 
-# 测试 BidAsk 定价模式
 [backtest.pricing_mode]
 mode = "bid_ask"
-spread_pct = 0.001  # 0.1% 价差
+spread_pct = 0.001

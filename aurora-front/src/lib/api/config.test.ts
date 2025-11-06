@@ -39,13 +39,13 @@ describe('ConfigService', () => {
       const mockConfigs: ConfigListItem[] = [
         {
           filename: 'test-config.toml',
+          path: '/configs/test-config.toml',
           modified: '2025-01-01T00:00:00Z',
-          size: 1024,
         },
         {
           filename: 'another-config.toml',
+          path: '/configs/another-config.toml',
           modified: '2025-01-02T00:00:00Z',
-          size: 2048,
         },
       ];
       const mockResponse = {

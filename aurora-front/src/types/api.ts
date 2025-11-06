@@ -49,8 +49,8 @@ export type ApiResponse<T> = {
  */
 export const ConfigListItemSchema = z.object({
   filename: z.string(),
+  path: z.string(),
   modified: z.string(),
-  size: z.number().optional(),
 });
 
 export type ConfigListItem = z.infer<typeof ConfigListItemSchema>;

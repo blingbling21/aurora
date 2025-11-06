@@ -36,6 +36,7 @@ import {
 } from '@/types/config-schema';
 import { readTOMLFile, stringifyTOML, validateTOML } from '@/lib/utils/toml';
 import { useNotificationStore } from '@/lib/store';
+import { configApi } from '@/lib/api';
 import {
   DataSourceSection,
   StrategiesSection,
@@ -44,6 +45,7 @@ import {
   BacktestSection,
   LiveSection,
 } from './ConfigSections';
+import { ConfigList } from '@/components/dashboard/ConfigList';
 
 /**
  * 配置管理页面
@@ -58,12 +60,50 @@ export default function ConfigPage() {
   const [tomlText, setTomlText] = useState('');
   const [filename, setFilename] = useState('config.toml');
   const [isValidating, setIsValidating] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // 文件输入引用
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // 通知store
   const { addNotification } = useNotificationStore();
+
+  /**
+   * 从服务器加载配置文件
+   */
+  const handleLoadConfig = async (selectedFilename: string) => {
+    try {
+      // 获取配置文件内容
+      const response = await configApi.get(selectedFilename);
+      
+      if (response.success && response.data) {
+        // 解析TOML内容
+        const result = await validateTOML(response.data);
+        
+        if (result.valid && result.config) {
+          setConfig(result.config);
+          setTomlText(response.data);
+          setFilename(selectedFilename);
+          setIsEditing(true);
+          setEditMode('form');
+          
+          addNotification({
+            type: 'success',
+            message: `成功加载配置文件: ${selectedFilename}`,
+          });
+        } else {
+          throw new Error('配置文件格式错误');
+        }
+      } else {
+        throw new Error(response.error || '加载配置文件失败');
+      }
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        message: error instanceof Error ? error.message : '加载配置文件失败',
+      });
+    }
+  };
 
   /**
    * 处理TOML文件导入
@@ -140,21 +180,25 @@ export default function ConfigPage() {
         contentToSave = await stringifyTOML(config);
       }
 
-      // 调用API保存配置
-      const { configApi } = await import('@/lib/api');
-      
-      // TODO: 判断是创建还是更新
-      // 暂时默认创建新配置
-      const response = await configApi.create({
-        filename,
-        content: contentToSave,
-      });
+      // 先检查配置是否已存在
+      const listResponse = await configApi.list();
+      const exists = listResponse.success && listResponse.data?.some(
+        item => item.filename === filename
+      );
+
+      // 根据是否存在选择创建或更新
+      const response = exists
+        ? await configApi.update(filename, { content: contentToSave })
+        : await configApi.create({ filename, content: contentToSave });
 
       if (response.success) {
         addNotification({
           type: 'success',
-          message: '配置保存成功',
+          message: `配置${exists ? '更新' : '保存'}成功`,
         });
+        
+        // 刷新配置列表
+        setRefreshTrigger(prev => prev + 1);
       } else {
         addNotification({
           type: 'error',
@@ -373,6 +417,12 @@ export default function ConfigPage() {
             </>
           )}
         </Card>
+
+        {/* 配置文件列表 */}
+        <ConfigList 
+          onSelect={handleLoadConfig}
+          refreshTrigger={refreshTrigger}
+        />
       </div>
     </div>
   );

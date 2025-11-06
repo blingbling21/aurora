@@ -27,6 +27,7 @@ import type {
   LoggingConfig,
   BacktestSettings,
   LiveConfig,
+  PricingMode,
 } from '@/types/config-schema';
 
 // ==================== 数据源配置区块 ====================
@@ -1022,6 +1023,73 @@ export function BacktestSection({ config, onChange }: BacktestSectionProps) {
               placeholder="2024-12-31"
               className="w-full"
             />
+          </div>
+
+          {/* 定价模式配置 */}
+          <div className="col-span-full">
+            <h5 className="text-sm font-semibold text-gray-800 mb-3 mt-2">定价模式配置</h5>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  定价模式:
+                </label>
+                <Select
+                  value={config.pricing_mode?.mode || 'none'}
+                  onValueChange={(value) => {
+                    if (value === 'none') {
+                      // 移除定价模式配置
+                      updateField('pricing_mode', undefined);
+                    } else if (value === 'close') {
+                      // 设置为收盘价模式
+                      updateField('pricing_mode', { mode: 'close' } as PricingMode);
+                    } else if (value === 'bid_ask') {
+                      // 设置为买一卖一价模式，默认价差 0.1%
+                      updateField('pricing_mode', { mode: 'bid_ask', spread_pct: 0.001 } as PricingMode);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="选择定价模式" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">默认(不设置)</SelectItem>
+                    <SelectItem value="close">收盘价模式</SelectItem>
+                    <SelectItem value="bid_ask">买一卖一价模式</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">
+                  控制回测中交易价格的计算方式
+                </p>
+              </div>
+
+              {/* 仅在选择买一卖一价模式时显示价差输入 */}
+              {config.pricing_mode?.mode === 'bid_ask' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    买卖价差百分比:
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    min="0"
+                    max="1"
+                    value={config.pricing_mode.spread_pct}
+                    onChange={(e) => {
+                      const newValue = parseFloat(e.target.value) || 0;
+                      updateField('pricing_mode', {
+                        mode: 'bid_ask',
+                        spread_pct: newValue,
+                      } as PricingMode);
+                    }}
+                    placeholder="0.001"
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    例如 0.001 表示 0.1% 的价差
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ) : (

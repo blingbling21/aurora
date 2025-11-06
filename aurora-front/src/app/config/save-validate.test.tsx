@@ -30,6 +30,7 @@ jest.mock('@/lib/api', () => ({
     create: jest.fn(),
     update: jest.fn(),
     validate: jest.fn(),
+    list: jest.fn(),
   },
 }));
 
@@ -230,6 +231,10 @@ describe('ConfigPage - 保存和验证功能', () => {
 
     it('成功保存配置后应该显示成功通知', async () => {
       // Mock API 响应
+      (apiModule.configApi.list as jest.Mock).mockResolvedValue({
+        success: true,
+        data: [],
+      });
       (apiModule.configApi.create as jest.Mock).mockResolvedValue({
         success: true,
         message: '配置已创建',
@@ -281,7 +286,11 @@ describe('ConfigPage - 保存和验证功能', () => {
     });
 
     it('保存配置失败应该显示错误通知', async () => {
-      // Mock API 响应为失败
+      // Mock API 响应
+      (apiModule.configApi.list as jest.Mock).mockResolvedValue({
+        success: true,
+        data: [],
+      });
       (apiModule.configApi.create as jest.Mock).mockResolvedValue({
         success: false,
         error: '文件已存在',

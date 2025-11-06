@@ -34,6 +34,23 @@ jest.mock('@/constants', () => ({
   ],
 }));
 
+// Mock DataList 组件
+jest.mock('@/components/dashboard/DataList', () => ({
+  DataList: () => (
+    <div data-testid="card" className="mt-6">
+      <h2>数据文件列表</h2>
+      <div className="flex justify-end mb-4">
+        <button data-testid="button" data-variant="secondary">
+          🔄 刷新
+        </button>
+      </div>
+      <div className="text-center py-8 text-gray-500">
+        暂无数据文件
+      </div>
+    </div>
+  ),
+}));
+
 // Mock 子组件
 jest.mock('@/components/ui', () => ({
   PageHeader: ({ icon, title }: { icon: string; title: string }) => (
@@ -48,19 +65,59 @@ jest.mock('@/components/ui', () => ({
       {children}
     </div>
   ),
-  Button: ({ children, variant }: { children: React.ReactNode; variant?: string }) => (
-    <button data-testid="button" data-variant={variant}>
+  Button: ({ children, variant, onClick, type }: { 
+    children: React.ReactNode; 
+    variant?: string; 
+    onClick?: () => void; 
+    type?: 'button' | 'submit' | 'reset' 
+  }) => (
+    <button data-testid="button" data-variant={variant} onClick={onClick} type={type}>
       {children}
     </button>
   ),
-  Input: ({ placeholder }: { placeholder?: string }) => (
-    <input data-testid="input" placeholder={placeholder} />
+  Input: ({ placeholder, value, onChange, className, type, required }: { 
+    placeholder?: string; 
+    value?: string; 
+    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void; 
+    className?: string;
+    type?: string;
+    required?: boolean;
+  }) => (
+    <input 
+      data-testid="input" 
+      placeholder={placeholder} 
+      value={value}
+      onChange={onChange}
+      className={className}
+      type={type}
+      required={required}
+    />
   ),
-  DatePicker: ({ placeholder }: { placeholder?: string }) => (
-    <div data-testid="date-picker">{placeholder}</div>
+  DatePicker: ({ placeholder, onDateChange }: { 
+    placeholder?: string; 
+    date?: Date;
+    onDateChange?: (date: Date | undefined) => void;
+    required?: boolean;
+    className?: string;
+  }) => (
+    <div data-testid="date-picker">
+      <input 
+        type="date" 
+        placeholder={placeholder}
+        onChange={(e) => onDateChange?.(e.target.value ? new Date(e.target.value) : undefined)}
+      />
+    </div>
   ),
-  Select: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="select">{children}</div>
+  Select: ({ children, value, onValueChange, required }: { 
+    children: React.ReactNode; 
+    value?: string; 
+    onValueChange?: (value: string) => void;
+    required?: boolean;
+  }) => (
+    <div data-testid="select" onClick={() => onValueChange?.('test-value')}>
+      <input type="hidden" value={value} />
+      {children}
+    </div>
   ),
   SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SelectItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -168,5 +225,39 @@ describe('DataPage', () => {
     
     const cards = screen.getAllByTestId('card');
     expect(cards.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // 测试文件名输入框
+  it('应该显示文件名输入框', () => {
+    render(<DataPage />);
+    
+    const inputs = screen.getAllByTestId('input');
+    const filenameInput = inputs.find(input => 
+      input.getAttribute('placeholder') === '自动生成'
+    );
+    expect(filenameInput).toBeInTheDocument();
+  });
+
+  // 测试预览文件名按钮
+  it('应该显示预览文件名按钮', () => {
+    render(<DataPage />);
+    
+    const buttons = screen.getAllByTestId('button');
+    const previewButton = buttons.find(btn => btn.textContent?.includes('预览文件名'));
+    expect(previewButton).toBeInTheDocument();
+  });
+
+  // 测试文件名可以手动编辑
+  it('文件名输入框应该可以手动编辑', () => {
+    render(<DataPage />);
+    
+    const inputs = screen.getAllByTestId('input');
+    const filenameInput = inputs.find(input => 
+      input.getAttribute('placeholder') === '自动生成'
+    ) as HTMLInputElement;
+    
+    expect(filenameInput).toBeInTheDocument();
+    // 验证输入框不是只读的
+    expect(filenameInput?.readOnly).toBeFalsy();
   });
 });

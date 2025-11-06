@@ -83,27 +83,38 @@ describe('API Types and Schemas', () => {
     it('应该验证有效的配置列表项', () => {
       const validItem = {
         filename: 'config.toml',
+        path: '/configs/config.toml',
         modified: '2025-01-01',
-        size: 1024,
       };
       
       expect(() => ConfigListItemSchema.parse(validItem)).not.toThrow();
     });
 
-    // 测试 size 字段可选
-    it('size 字段应该是可选的', () => {
+    // 测试所有字段
+    it('应该包含 path 字段', () => {
       const validItem = {
         filename: 'config.toml',
+        path: '/configs/config.toml',
         modified: '2025-01-01',
       };
       
-      expect(() => ConfigListItemSchema.parse(validItem)).not.toThrow();
+      const result = ConfigListItemSchema.parse(validItem);
+      expect(result.path).toBe('/configs/config.toml');
     });
 
     // 测试无效数据
     it('缺少必需字段应该失败', () => {
       const invalidItem = {
         filename: 'config.toml',
+      };
+      
+      expect(() => ConfigListItemSchema.parse(invalidItem)).toThrow();
+    });
+
+    it('缺少 path 字段应该失败', () => {
+      const invalidItem = {
+        filename: 'config.toml',
+        modified: '2025-01-01',
       };
       
       expect(() => ConfigListItemSchema.parse(invalidItem)).toThrow();

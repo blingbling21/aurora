@@ -17,8 +17,8 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { StrategiesSection, PortfolioSection } from './ConfigSections';
-import type { StrategyConfig, PortfolioConfig } from '@/types/config-schema';
+import { StrategiesSection, PortfolioSection, BacktestSection } from './ConfigSections';
+import type { StrategyConfig, PortfolioConfig, BacktestSettings } from '@/types/config-schema';
 
 describe('StrategiesSection', () => {
   // 测试策略配置组件渲染
@@ -317,5 +317,219 @@ describe('PortfolioSection', () => {
         }),
       })
     );
+  });
+});
+
+describe('BacktestSection', () => {
+  // 测试回测配置组件渲染
+  it('should render backtest configuration section', () => {
+    const mockConfig: BacktestSettings = {
+      data_path: 'btc_1h.csv',
+      symbol: 'BTCUSDT',
+      interval: '1h',
+    };
+    const mockOnChange = jest.fn();
+
+    render(<BacktestSection config={mockConfig} onChange={mockOnChange} />);
+
+    // 检查标题
+    expect(screen.getByText('回测配置 (可选)')).toBeInTheDocument();
+    
+    // 检查数据文件路径输入框
+    expect(screen.getByDisplayValue('btc_1h.csv')).toBeInTheDocument();
+    
+    // 检查交易对符号输入框
+    expect(screen.getByDisplayValue('BTCUSDT')).toBeInTheDocument();
+    
+    // 检查时间间隔输入框
+    expect(screen.getByDisplayValue('1h')).toBeInTheDocument();
+  });
+
+  // 测试未启用回测配置时的渲染
+  it('should render disabled state when config is undefined', () => {
+    const mockOnChange = jest.fn();
+
+    render(<BacktestSection config={undefined} onChange={mockOnChange} />);
+
+    expect(screen.getByText('回测配置未启用')).toBeInTheDocument();
+    expect(screen.getByText('+ 启用回测配置')).toBeInTheDocument();
+  });
+
+  // 测试启用回测配置
+  it('should enable backtest configuration', () => {
+    const mockOnChange = jest.fn();
+
+    render(<BacktestSection config={undefined} onChange={mockOnChange} />);
+
+    const enableButton = screen.getByText('+ 启用回测配置');
+    fireEvent.click(enableButton);
+
+    expect(mockOnChange).toHaveBeenCalledWith({ data_path: '' });
+  });
+
+  // 测试定价模式选择为收盘价模式
+  it('should select close pricing mode', () => {
+    const mockConfig: BacktestSettings = {
+      data_path: 'btc_1h.csv',
+      symbol: 'BTCUSDT',
+      interval: '1h',
+    };
+    const mockOnChange = jest.fn();
+
+    render(<BacktestSection config={mockConfig} onChange={mockOnChange} />);
+
+    // 找到定价模式下拉框
+    const pricingModeSelect = screen.getAllByRole('combobox').find(
+      (element) => element.closest('div')?.querySelector('label')?.textContent?.includes('定价模式')
+    );
+    
+    expect(pricingModeSelect).toBeDefined();
+    if (pricingModeSelect) {
+      fireEvent.click(pricingModeSelect);
+
+      // 选择收盘价模式
+      const closeOption = screen.getByText('收盘价模式');
+      fireEvent.click(closeOption);
+
+      expect(mockOnChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pricing_mode: {
+            mode: 'close',
+          },
+        })
+      );
+    }
+  });
+
+  // 测试定价模式选择为买一卖一价模式
+  it('should select bid_ask pricing mode with default spread', () => {
+    const mockConfig: BacktestSettings = {
+      data_path: 'btc_1h.csv',
+      symbol: 'BTCUSDT',
+      interval: '1h',
+    };
+    const mockOnChange = jest.fn();
+
+    render(<BacktestSection config={mockConfig} onChange={mockOnChange} />);
+
+    // 找到定价模式下拉框
+    const pricingModeSelect = screen.getAllByRole('combobox').find(
+      (element) => element.closest('div')?.querySelector('label')?.textContent?.includes('定价模式')
+    );
+    
+    expect(pricingModeSelect).toBeDefined();
+    if (pricingModeSelect) {
+      fireEvent.click(pricingModeSelect);
+
+      // 选择买一卖一价模式
+      const bidAskOption = screen.getByText('买一卖一价模式');
+      fireEvent.click(bidAskOption);
+
+      expect(mockOnChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pricing_mode: {
+            mode: 'bid_ask',
+            spread_pct: 0.001,
+          },
+        })
+      );
+    }
+  });
+
+  // 测试修改买卖价差百分比
+  it('should update spread_pct for bid_ask pricing mode', () => {
+    const mockConfig: BacktestSettings = {
+      data_path: 'btc_1h.csv',
+      symbol: 'BTCUSDT',
+      interval: '1h',
+      pricing_mode: {
+        mode: 'bid_ask',
+        spread_pct: 0.001,
+      },
+    };
+    const mockOnChange = jest.fn();
+
+    render(<BacktestSection config={mockConfig} onChange={mockOnChange} />);
+
+    // 找到价差输入框
+    const spreadInput = screen.getByDisplayValue('0.001');
+    fireEvent.change(spreadInput, { target: { value: '0.002' } });
+
+    expect(mockOnChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pricing_mode: {
+          mode: 'bid_ask',
+          spread_pct: 0.002,
+        },
+      })
+    );
+  });
+
+  // 测试取消定价模式设置
+  it('should remove pricing mode when selecting none', () => {
+    const mockConfig: BacktestSettings = {
+      data_path: 'btc_1h.csv',
+      symbol: 'BTCUSDT',
+      interval: '1h',
+      pricing_mode: {
+        mode: 'close',
+      },
+    };
+    const mockOnChange = jest.fn();
+
+    render(<BacktestSection config={mockConfig} onChange={mockOnChange} />);
+
+    // 找到定价模式下拉框
+    const pricingModeSelect = screen.getAllByRole('combobox').find(
+      (element) => element.closest('div')?.querySelector('label')?.textContent?.includes('定价模式')
+    );
+    
+    expect(pricingModeSelect).toBeDefined();
+    if (pricingModeSelect) {
+      fireEvent.click(pricingModeSelect);
+
+      // 选择默认(不设置)
+      const noneOption = screen.getByText('默认(不设置)');
+      fireEvent.click(noneOption);
+
+      expect(mockOnChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pricing_mode: undefined,
+        })
+      );
+    }
+  });
+
+  // 测试spread_pct输入框仅在bid_ask模式下显示
+  it('should only show spread_pct input for bid_ask mode', () => {
+    const mockOnChange = jest.fn();
+
+    // 测试收盘价模式
+    const { rerender } = render(
+      <BacktestSection 
+        config={{
+          data_path: 'btc_1h.csv',
+          pricing_mode: { mode: 'close' },
+        }} 
+        onChange={mockOnChange} 
+      />
+    );
+
+    // 不应显示价差输入框
+    expect(screen.queryByText('买卖价差百分比:')).not.toBeInTheDocument();
+
+    // 测试买一卖一价模式
+    rerender(
+      <BacktestSection 
+        config={{
+          data_path: 'btc_1h.csv',
+          pricing_mode: { mode: 'bid_ask', spread_pct: 0.001 },
+        }} 
+        onChange={mockOnChange} 
+      />
+    );
+
+    // 应显示价差输入框
+    expect(screen.getByText('买卖价差百分比:')).toBeInTheDocument();
   });
 });

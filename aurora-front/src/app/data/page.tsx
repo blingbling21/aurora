@@ -29,8 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui';
-import { DataFile } from '@/types';
 import { EXCHANGE_OPTIONS, INTERVAL_OPTIONS, SYMBOL_OPTIONS } from '@/constants';
+import { DataList } from '@/components/dashboard/DataList';
+import { generateDataFilename } from '@/lib/utils/filename';
 
 /**
  * 数据管理页面
@@ -38,18 +39,95 @@ import { EXCHANGE_OPTIONS, INTERVAL_OPTIONS, SYMBOL_OPTIONS } from '@/constants'
  * 管理和下载历史市场数据
  */
 export default function DataPage() {
-  // 状态管理
-  const [dataFiles] = useState<DataFile[]>([]);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
+  // 表单状态管理
+  const [exchange, setExchange] = useState('');
+  const [symbol, setSymbol] = useState('');
+  const [interval, setInterval] = useState('');
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
+  const [filename, setFilename] = useState('');
+  
+  // 下载进度状态
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  /**
+   * 处理交易对下拉框变化
+   * 当用户从下拉框选择交易对时，自动填充到输入框
+   */
+  const handleSymbolSelectChange = (value: string) => {
+    if (value) {
+      setSymbol(value);
+      // 触发文件名更新
+      updateFilename(exchange, value, interval, startDate, endDate);
+    }
+  };
+
+  /**
+   * 更新文件名
+   * 根据表单输入自动生成文件名
+   */
+  const updateFilename = (
+    ex: string,
+    sym: string,
+    int: string,
+    start: Date | undefined,
+    end: Date | undefined
+  ) => {
+    const generatedFilename = generateDataFilename(ex, sym, int, start, end);
+    setFilename(generatedFilename);
+  };
+
+  /**
+   * 处理表单字段变化，自动更新文件名
+   */
+  const handleExchangeChange = (value: string) => {
+    setExchange(value);
+    updateFilename(value, symbol, interval, startDate, endDate);
+  };
+
+  const handleSymbolChange = (value: string) => {
+    setSymbol(value);
+    updateFilename(exchange, value, interval, startDate, endDate);
+  };
+
+  const handleIntervalChange = (value: string) => {
+    setInterval(value);
+    updateFilename(exchange, symbol, value, startDate, endDate);
+  };
+
+  const handleStartDateChange = (date: Date | undefined) => {
+    setStartDate(date);
+    updateFilename(exchange, symbol, interval, date, endDate);
+  };
+
+  const handleEndDateChange = (date: Date | undefined) => {
+    setEndDate(date);
+    updateFilename(exchange, symbol, interval, startDate, date);
+  };
+
+  /**
+   * 预览文件名
+   */
+  const handlePreviewFilename = () => {
+    if (filename) {
+      alert(`文件将保存为: ${filename}`);
+    } else {
+      alert('请先填写所有必填字段');
+    }
+  };
+
+  /**
+   * TODO: 实现数据下载完成后刷新列表
+   * 在下载完成回调中调用: setRefreshTrigger(prev => prev + 1)
+   */
 
   return (
     <div>
       {/* 页面头部 */}
       <PageHeader
-        icon="�"
+        icon="📁"
         title="数据管理"
         description="管理和下载历史市场数据"
       />
@@ -62,7 +140,7 @@ export default function DataPage() {
             setIsDownloading(true);
             setDownloadProgress(0);
             // 后续实现下载逻辑
-            console.log('开始下载数据');
+            console.log('开始下载数据', { exchange, symbol, interval, startDate, endDate, filename });
           }}
           className="space-y-4"
         >
@@ -71,7 +149,7 @@ export default function DataPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 交易所:
               </label>
-              <Select required>
+              <Select required value={exchange} onValueChange={handleExchangeChange}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="-- 请选择 --" />
                 </SelectTrigger>
@@ -90,7 +168,7 @@ export default function DataPage() {
                 交易对:
               </label>
               <div className="flex gap-2">
-                <Select>
+                <Select value={symbol} onValueChange={handleSymbolSelectChange}>
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="-- 选择或手动输入 --" />
                   </SelectTrigger>
@@ -105,6 +183,8 @@ export default function DataPage() {
                 <Input
                   type="text"
                   required
+                  value={symbol}
+                  onChange={(e) => handleSymbolChange(e.target.value.toUpperCase())}
                   placeholder="例如: BTCUSDT"
                   className="flex-2 uppercase"
                 />
@@ -118,7 +198,7 @@ export default function DataPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 时间周期:
               </label>
-              <Select required>
+              <Select required value={interval} onValueChange={handleIntervalChange}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="-- 请选择 --" />
                 </SelectTrigger>
@@ -140,7 +220,7 @@ export default function DataPage() {
               </label>
               <DatePicker
                 date={startDate}
-                onDateChange={setStartDate}
+                onDateChange={handleStartDateChange}
                 placeholder="选择开始日期"
                 required
                 className="w-full"
@@ -153,7 +233,7 @@ export default function DataPage() {
               </label>
               <DatePicker
                 date={endDate}
-                onDateChange={setEndDate}
+                onDateChange={handleEndDateChange}
                 placeholder="选择结束日期"
                 required
                 className="w-full"
@@ -166,16 +246,17 @@ export default function DataPage() {
               </label>
               <Input
                 type="text"
+                value={filename}
+                onChange={(e) => setFilename(e.target.value)}
                 placeholder="自动生成"
-                readOnly
-                className="w-full bg-gray-50"
+                className="w-full"
               />
             </div>
           </div>
 
           <div className="flex gap-3">
             <Button type="submit">📥 开始下载</Button>
-            <Button type="button" variant="secondary">
+            <Button type="button" variant="secondary" onClick={handlePreviewFilename}>
               👁️ 预览文件名
             </Button>
           </div>
@@ -201,39 +282,7 @@ export default function DataPage() {
       </Card>
 
       {/* 数据文件列表 */}
-      <Card title="数据文件列表" className="mt-6">
-        <div className="flex justify-end mb-4">
-          <Button variant="secondary">🔄 刷新</Button>
-        </div>
-
-        {dataFiles.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">暂无数据文件</p>
-        ) : (
-          <div className="space-y-3">
-            {dataFiles.map((file) => (
-              <div
-                key={file.path}
-                className="p-4 border border-gray-200 rounded-md hover:border-blue-500 hover:shadow-sm transition-all cursor-pointer"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-semibold text-gray-900">{file.name}</h4>
-                    <div className="flex gap-4 text-xs text-gray-500 mt-1">
-                      <span>大小: {(file.size / 1024 / 1024).toFixed(2)} MB</span>
-                      <span>
-                        修改: {new Date(file.lastModified).toLocaleString('zh-CN')}
-                      </span>
-                    </div>
-                  </div>
-                  <Button variant="secondary" size="sm">
-                    删除
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
+      <DataList refreshTrigger={refreshTrigger} />
     </div>
   );
 }

@@ -18,6 +18,23 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import ConfigPage from './page';
 
+// Mock ConfigList 组件
+jest.mock('@/components/dashboard/ConfigList', () => ({
+  ConfigList: () => (
+    <div data-testid="config-list" className="bg-white rounded-lg p-6 shadow-sm mt-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">配置文件列表</h3>
+      <div className="flex justify-end mb-4">
+        <button data-testid="button" data-variant="secondary">
+          🔄 刷新
+        </button>
+      </div>
+      <div className="text-center py-8 text-gray-500">
+        暂无配置文件
+      </div>
+    </div>
+  ),
+}));
+
 // Mock 子组件
 jest.mock('@/components/ui', () => ({
   PageHeader: ({ icon, title }: { icon: string; title: string }) => (

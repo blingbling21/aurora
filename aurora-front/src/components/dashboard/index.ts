@@ -16,3 +16,5 @@
 
 export { StatCard } from './StatCard';
 export { TaskItem } from './TaskItem';
+export { ConfigList } from './ConfigList';
+export { DataList } from './DataList';

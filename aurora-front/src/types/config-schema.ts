@@ -194,6 +194,37 @@ export const LoggingConfigSchema = z.object({
 
 export type LoggingConfig = z.infer<typeof LoggingConfigSchema>;
 
+// ==================== 定价模式配置 ====================
+
+/**
+ * 收盘价定价模式Schema
+ * 使用收盘价执行交易(简单模式)
+ */
+export const PricingModeCloseSchema = z.object({
+  mode: z.literal('close'),
+});
+
+/**
+ * 买一卖一价定价模式Schema
+ * 使用买一卖一价执行交易(更真实的模式)
+ */
+export const PricingModeBidAskSchema = z.object({
+  mode: z.literal('bid_ask'),
+  // 买卖价差百分比(例如 0.001 表示 0.1% 的价差)
+  spread_pct: z.number().min(0).max(1, '价差百分比必须在0到1之间'),
+});
+
+/**
+ * 定价模式配置Schema(联合类型)
+ * 用于控制回测中交易价格的计算方式
+ */
+export const PricingModeSchema = z.discriminatedUnion('mode', [
+  PricingModeCloseSchema,
+  PricingModeBidAskSchema,
+]).optional();
+
+export type PricingMode = z.infer<typeof PricingModeSchema>;
+
 // ==================== 回测配置 ====================
 
 /**
@@ -210,6 +241,8 @@ export const BacktestSettingsSchema = z.object({
   start_time: z.string().optional(),
   // 回测结束时间(可选)
   end_time: z.string().optional(),
+  // 定价模式配置(可选)
+  pricing_mode: PricingModeSchema,
 }).optional();
 
 export type BacktestSettings = z.infer<typeof BacktestSettingsSchema>;
