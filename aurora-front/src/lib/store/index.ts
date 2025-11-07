@@ -23,4 +23,5 @@ export { useBacktestTaskStore } from './backtestTaskStore';
 export { useBacktestResultStore } from './backtestResultStore';
 export { useConfigStore } from './configStore';
 export { useDataStore } from './dataStore';
+export { useDataDownloadStore } from './dataDownloadStore';
 export { useNotificationStore } from './notificationStore';

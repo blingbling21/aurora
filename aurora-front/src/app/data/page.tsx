@@ -16,7 +16,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   PageHeader,
   Button,
@@ -32,6 +32,10 @@ import {
 import { EXCHANGE_OPTIONS, INTERVAL_OPTIONS, SYMBOL_OPTIONS } from '@/constants';
 import { DataList } from '@/components/dashboard/DataList';
 import { generateDataFilename } from '@/lib/utils/filename';
+import { dataApi } from '@/lib/api';
+import { useDataDownloadStore } from '@/lib/store/dataDownloadStore';
+import { useDataDownloadWebSocket } from '@/lib/hooks/useDataDownloadWebSocket';
+import { useNotificationStore } from '@/lib/store/notificationStore';
 
 /**
  * 数据管理页面
@@ -46,11 +50,77 @@ export default function DataPage() {
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [filename, setFilename] = useState('');
-  
-  // 下载进度状态
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // 下载状态管理
+  const {
+    activeTask,
+    showProgressPanel,
+    startDownload,
+    updateProgress,
+    completeDownload,
+    failDownload,
+  } = useDataDownloadStore();
+
+  // 通知管理
+  const { addNotification } = useNotificationStore();
+
+  // 使用 useCallback 包裹回调函数，避免每次渲染都创建新函数
+  const handleWebSocketConnected = useCallback(() => {
+    console.log('WebSocket 已连接');
+  }, []);
+
+  const handleWebSocketProgress = useCallback((progress: {
+    progress: number;
+    status: string;
+    progressMessage: string;
+    downloadedCount: number;
+    estimatedTotal: number | null;
+  }) => {
+    // 更新下载进度
+    // status 需要转换为 DownloadStatus 类型
+    const validStatus = ['Pending', 'Downloading', 'Completed', 'Failed'].includes(progress.status)
+      ? progress.status as 'Pending' | 'Downloading' | 'Completed' | 'Failed'
+      : 'Downloading';
+    
+    updateProgress(
+      progress.progress,
+      validStatus,
+      progress.progressMessage,
+      progress.downloadedCount,
+      progress.estimatedTotal
+    );
+  }, [updateProgress]);
+
+  const handleWebSocketComplete = useCallback((downloadedCount: number) => {
+    // 下载完成
+    completeDownload(downloadedCount);
+    addNotification({
+      type: 'success',
+      message: `数据下载完成，共获取 ${downloadedCount} 条数据`,
+    });
+    // 刷新数据列表
+    setRefreshTrigger((prev) => prev + 1);
+  }, [completeDownload, addNotification]);
+
+  const handleWebSocketError = useCallback((error: string) => {
+    // 下载失败
+    failDownload(error);
+    addNotification({
+      type: 'error',
+      message: `数据下载失败: ${error}`,
+    });
+  }, [failDownload, addNotification]);
+
+  // WebSocket 连接
+  const { connectionStatus } = useDataDownloadWebSocket(activeTask?.taskId || null, {
+    autoConnect: true,
+    isTaskCompleted: activeTask?.status === 'Completed' || activeTask?.status === 'Failed',
+    onConnected: handleWebSocketConnected,
+    onProgress: handleWebSocketProgress,
+    onComplete: handleWebSocketComplete,
+    onError: handleWebSocketError,
+  });
 
   /**
    * 处理交易对下拉框变化
@@ -108,6 +178,63 @@ export default function DataPage() {
   };
 
   /**
+   * 处理下载表单提交
+   */
+  const handleDownloadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // 验证必填字段
+    if (!exchange || !symbol || !interval || !startDate || !endDate) {
+      addNotification({
+        type: 'error',
+        message: '请填写所有必填字段',
+      });
+      return;
+    }
+
+    // 验证日期范围
+    if (startDate >= endDate) {
+      addNotification({
+        type: 'error',
+        message: '开始日期必须早于结束日期',
+      });
+      return;
+    }
+
+    try {
+      // 构建请求参数
+      const request = {
+        exchange,
+        symbol: symbol.toUpperCase(),
+        interval,
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
+        filename: filename || undefined,
+      };
+
+      // 发送下载请求
+      const response = await dataApi.fetch(request);
+
+      if (response.success && response.data) {
+        // 开始下载任务
+        startDownload(response.data.task_id, response.data.filename);
+        addNotification({
+          type: 'info',
+          message: '数据下载任务已创建，正在连接...',
+        });
+      } else {
+        throw new Error(response.error || '创建下载任务失败');
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : '下载失败';
+      addNotification({
+        type: 'error',
+        message: errorMsg,
+      });
+    }
+  };
+
+  /**
    * 预览文件名
    */
   const handlePreviewFilename = () => {
@@ -117,11 +244,6 @@ export default function DataPage() {
       alert('请先填写所有必填字段');
     }
   };
-
-  /**
-   * TODO: 实现数据下载完成后刷新列表
-   * 在下载完成回调中调用: setRefreshTrigger(prev => prev + 1)
-   */
 
   return (
     <div>
@@ -134,16 +256,7 @@ export default function DataPage() {
 
       {/* 数据下载表单 */}
       <Card title="下载数据">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setIsDownloading(true);
-            setDownloadProgress(0);
-            // 后续实现下载逻辑
-            console.log('开始下载数据', { exchange, symbol, interval, startDate, endDate, filename });
-          }}
-          className="space-y-4"
-        >
+        <form onSubmit={handleDownloadSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -262,21 +375,49 @@ export default function DataPage() {
           </div>
         </form>
 
-        {/* 下载进度 */}
-        {isDownloading && (
+        {/* 下载进度显示 - 只在 showProgressPanel 为 true 时显示 */}
+        {activeTask && showProgressPanel && (
           <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex justify-between items-center mb-2 text-sm">
-              <span className="font-medium text-gray-900">准备下载...</span>
+            <div className="flex justify-between items-center mb-2">
+              <div>
+                <span className="font-medium text-gray-900">
+                  {activeTask.status === 'Completed' ? '✅ ' : ''}
+                  {activeTask.status === 'Failed' ? '❌ ' : ''}
+                  {activeTask.status === 'Downloading' ? '📥 ' : ''}
+                  {activeTask.progressMessage}
+                </span>
+                <div className="text-xs text-gray-500 mt-1">
+                  {activeTask.estimatedTotal
+                    ? `${activeTask.downloadedCount} / ${activeTask.estimatedTotal} 条数据`
+                    : `${activeTask.downloadedCount} 条数据`}
+                </div>
+              </div>
               <span className="font-semibold text-blue-500">
-                {downloadProgress}%
+                {Math.round(activeTask.progress)}%
               </span>
             </div>
             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
-                className="h-full bg-linear-to-r from-blue-500 to-green-500 rounded-full transition-all duration-300"
-                style={{ width: `${downloadProgress}%` }}
+                className={`h-full rounded-full transition-all duration-300 ${
+                  activeTask.status === 'Completed'
+                    ? 'bg-green-500'
+                    : activeTask.status === 'Failed'
+                    ? 'bg-red-500'
+                    : 'bg-linear-to-r from-blue-500 to-green-500'
+                }`}
+                style={{ width: `${activeTask.progress}%` }}
               />
             </div>
+            {activeTask.error && (
+              <div className="mt-2 text-sm text-red-600">
+                错误: {activeTask.error}
+              </div>
+            )}
+            {connectionStatus !== 'connected' && activeTask.status === 'Downloading' && (
+              <div className="mt-2 text-xs text-yellow-600">
+                ⚠️ WebSocket 连接状态: {connectionStatus}
+              </div>
+            )}
           </div>
         )}
       </Card>

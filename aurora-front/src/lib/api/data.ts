@@ -21,6 +21,7 @@ import type {
   ApiResponse,
   DataFileItem,
   FetchDataRequest,
+  DownloadTaskResponse,
   Kline,
 } from '@/types/api';
 
@@ -57,9 +58,10 @@ export class DataService {
    * 获取历史数据（从交易所下载）
    * 
    * @param request 获取数据请求
+   * @returns 返回包含任务ID的响应
    */
-  static async fetch(request: FetchDataRequest): Promise<ApiResponse<void>> {
-    return post<void>('/data/fetch', request);
+  static async fetch(request: FetchDataRequest): Promise<ApiResponse<DownloadTaskResponse>> {
+    return post<DownloadTaskResponse>('/data/fetch', request);
   }
 
   /**

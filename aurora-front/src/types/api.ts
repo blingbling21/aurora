@@ -127,6 +127,40 @@ export const KlineSchema = z.object({
 
 export type Kline = z.infer<typeof KlineSchema>;
 
+/**
+ * 数据下载任务响应 Schema
+ */
+export const DownloadTaskResponseSchema = z.object({
+  task_id: z.string(),
+  message: z.string(),
+  filename: z.string(),
+});
+
+export type DownloadTaskResponse = z.infer<typeof DownloadTaskResponseSchema>;
+
+/**
+ * 下载任务状态
+ */
+export const DownloadStatusSchema = z.enum(['Pending', 'Downloading', 'Completed', 'Failed']);
+export type DownloadStatus = z.infer<typeof DownloadStatusSchema>;
+
+/**
+ * 数据下载进度消息 Schema
+ */
+export const DownloadProgressMessageSchema = z.object({
+  type: z.enum(['connected', 'progress', 'complete', 'error']),
+  task_id: z.string().optional(),
+  status: DownloadStatusSchema.optional(),
+  progress: z.number().optional(),
+  progress_message: z.string().optional(),
+  downloaded_count: z.number().optional(),
+  estimated_total: z.number().optional().nullable(),
+  error: z.string().optional().nullable(),
+  message: z.string().optional(),
+});
+
+export type DownloadProgressMessage = z.infer<typeof DownloadProgressMessageSchema>;
+
 // ============ 回测相关类型 ============
 
 /**

@@ -17,3 +17,4 @@
  */
 
 export * from './useBacktestWebSocket';
+export * from './useDataDownloadWebSocket';

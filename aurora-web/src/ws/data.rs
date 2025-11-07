@@ -21,7 +21,6 @@ use axum::{
     },
     response::{IntoResponse, Response},
 };
-use futures_util::SinkExt;
 use tracing::{debug, info};
 use uuid::Uuid;
 
@@ -107,7 +106,11 @@ async fn handle_socket(mut socket: WebSocket, state: AppState, task_id: Uuid) {
                         
                         // 给客户端一点时间处理消息
                         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                        let _ = socket.close().await;
+                        // 使用正常关闭码1000
+                        let _ = socket.send(Message::Close(Some(axum::extract::ws::CloseFrame {
+                            code: 1000,
+                            reason: "下载完成".into(),
+                        }))).await;
                         break;
                     }
                 } else {
@@ -116,7 +119,11 @@ async fn handle_socket(mut socket: WebSocket, state: AppState, task_id: Uuid) {
                         "message": "下载任务不存在"
                     });
                     let _ = socket.send(Message::Text(error_msg.to_string().into())).await;
-                    let _ = socket.close().await;
+                    // 使用正常关闭码1000
+                    let _ = socket.send(Message::Close(Some(axum::extract::ws::CloseFrame {
+                        code: 1000,
+                        reason: "任务不存在".into(),
+                    }))).await;
                     break;
                 }
             }
