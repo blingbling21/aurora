@@ -54,6 +54,8 @@ export interface UseWebSocketOptions extends WsMessageHandlers {
   maxReconnectAttempts?: number;
   // 心跳间隔（毫秒）
   heartbeatInterval?: number;
+  // 任务是否已完成（用于防止重连）
+  isTaskCompleted?: boolean;
 }
 
 /**
@@ -90,6 +92,7 @@ export function useBacktestWebSocket(
     reconnectInterval = 3000,
     maxReconnectAttempts = 5,
     heartbeatInterval = 30000,
+    isTaskCompleted = false,
     onConnected,
     onStatusUpdate,
     onComplete,
@@ -105,6 +108,8 @@ export function useBacktestWebSocket(
   const reconnectCountRef = useRef(0);
   // 重连定时器
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // 是否手动断开连接（用于区分正常完成和异常断开）
+  const manualDisconnectRef = useRef(false);
 
   // 连接状态
   const [status, setStatus] = useState<WsConnectionStatus>('disconnected');
@@ -142,6 +147,7 @@ export function useBacktestWebSocket(
     (event: MessageEvent) => {
       try {
         const message = JSON.parse(event.data) as WsMessage;
+        console.log('📦 解析后的消息:', message); // 添加调试日志
         setLastMessage(message);
 
         // 调用通用消息处理器
@@ -150,22 +156,35 @@ export function useBacktestWebSocket(
         // 根据消息类型分发处理
         switch (message.type) {
           case 'connected':
+            console.log('✅ 收到连接确认消息');
             onConnected?.();
             break;
           case 'status_update':
+            console.log('📊 收到状态更新:', message.progress, message.status);
             if (message.progress !== undefined && message.status) {
               onStatusUpdate?.(message.progress, message.status);
             }
             break;
           case 'final':
+            console.log('🏁 收到最终消息，准备关闭连接');
+            // 标记为手动断开,避免触发重连逻辑
+            manualDisconnectRef.current = true;
             onComplete?.(message.data);
+            // 收到final消息后，主动断开WebSocket连接
+            // 使用正常关闭码,避免触发重连逻辑
+            if (wsRef.current) {
+              wsRef.current.close(1000, '任务已完成'); // 正常关闭
+            }
             break;
           case 'error':
+            console.error('❌ 收到错误消息:', message.error || message.message);
             onError?.(message.error || message.message || '未知错误');
             break;
+          default:
+            console.warn('⚠️  未知消息类型:', message.type);
         }
       } catch (error) {
-        console.error('解析 WebSocket 消息失败:', error);
+        console.error('❌ 解析 WebSocket 消息失败:', error, '原始数据:', event.data);
         onError?.('消息解析失败');
       }
     },
@@ -176,8 +195,8 @@ export function useBacktestWebSocket(
    * 连接 WebSocket
    */
   const connect = useCallback(() => {
-    // 如果没有任务 ID，不连接
-    if (!taskId) {
+    // 如果没有任务 ID 或任务已完成，不连接
+    if (!taskId || isTaskCompleted) {
       return;
     }
 
@@ -191,47 +210,58 @@ export function useBacktestWebSocket(
     }
 
     setStatus('connecting');
+    manualDisconnectRef.current = false;
 
     // 内部递归重连函数
     const attemptConnect = () => {
       try {
         const url = backtestApi.getWebSocketUrl(taskId);
+        console.log('尝试连接 WebSocket:', url); // 添加调试日志
         const ws = new WebSocket(url);
         wsRef.current = ws;
 
         // 连接打开
         ws.onopen = () => {
-          console.log('WebSocket 已连接');
+          console.log('✅ WebSocket 已连接');
           setStatus('connected');
           reconnectCountRef.current = 0;
           startHeartbeat();
         };
 
         // 接收消息
-        ws.onmessage = handleMessage;
+        ws.onmessage = (event) => {
+          console.log('📨 收到 WebSocket 消息:', event.data); // 添加调试日志
+          handleMessage(event);
+        };
 
         // 连接错误
         ws.onerror = (event) => {
-          console.error('WebSocket 错误:', event);
+          console.error('❌ WebSocket 错误:', event);
           setStatus('error');
           onError?.('连接错误');
         };
 
         // 连接关闭
         ws.onclose = (event) => {
-          console.log('WebSocket 已关闭:', event.code, event.reason);
+          console.log('WebSocket 已关闭. Code:', event.code, 'Reason:', event.reason);
           setStatus('disconnected');
           clearHeartbeat();
           wsRef.current = null;
 
-          // 尝试重连
+          // 如果是手动断开或任务已完成,不进行重连
+          if (manualDisconnectRef.current || isTaskCompleted) {
+            console.log('✅ 任务已完成或手动断开,不再重连');
+            return;
+          }
+
+          // 尝试重连 - 仅在非正常关闭且未达到最大重连次数时
           if (
             !event.wasClean &&
             reconnectCountRef.current < maxReconnectAttempts
           ) {
             reconnectCountRef.current++;
             console.log(
-              `尝试重连 (${reconnectCountRef.current}/${maxReconnectAttempts})...`
+              `🔄 尝试重连 (${reconnectCountRef.current}/${maxReconnectAttempts})...`
             );
             reconnectTimeoutRef.current = setTimeout(() => {
               attemptConnect();
@@ -239,7 +269,7 @@ export function useBacktestWebSocket(
           }
         };
       } catch (error) {
-        console.error('创建 WebSocket 失败:', error);
+        console.error('❌ 创建 WebSocket 失败:', error);
         setStatus('error');
         onError?.('创建连接失败');
       }
@@ -248,6 +278,7 @@ export function useBacktestWebSocket(
     attemptConnect();
   }, [
     taskId,
+    isTaskCompleted,
     handleMessage,
     onError,
     startHeartbeat,
@@ -268,6 +299,9 @@ export function useBacktestWebSocket(
 
     // 清理心跳
     clearHeartbeat();
+
+    // 标记为手动断开
+    manualDisconnectRef.current = true;
 
     // 关闭连接
     if (wsRef.current) {
@@ -292,7 +326,10 @@ export function useBacktestWebSocket(
 
   // 自动连接
   useEffect(() => {
-    if (autoConnect && taskId) {
+    if (autoConnect && taskId && !isTaskCompleted) {
+      // 当 taskId 变化时,重置手动断开标志
+      manualDisconnectRef.current = false;
+      
       // 使用 setTimeout 避免在 effect 中同步调用 setState
       const timer = setTimeout(() => {
         connect();
@@ -310,7 +347,7 @@ export function useBacktestWebSocket(
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskId, autoConnect]);
+  }, [taskId, autoConnect, isTaskCompleted]);
 
   return {
     status,

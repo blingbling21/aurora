@@ -83,10 +83,19 @@ export class BacktestService {
    * @param taskId 任务 ID
    */
   static getWebSocketUrl(taskId: string): string {
-    // 根据当前协议确定 WebSocket 协议
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    return `${protocol}//${host}/ws/backtest/${encodeURIComponent(taskId)}`;
+    // 从环境变量获取API基础URL
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
+    
+    // 提取主机地址（移除/api路径）
+    const url = new URL(apiBaseUrl);
+    const protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = url.host; // 这里会包含端口号
+    
+    // 构建WebSocket URL
+    const wsUrl = `${protocol}//${host}/ws/backtest/${encodeURIComponent(taskId)}`;
+    
+    console.log('WebSocket URL:', wsUrl); // 调试日志
+    return wsUrl;
   }
 }
 

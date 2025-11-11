@@ -233,21 +233,61 @@ describe('BacktestService', () => {
   });
 
   describe('getWebSocketUrl', () => {
-    it('应该根据当前协议生成正确的 WebSocket URL', () => {
+    // 保存原始环境变量
+    const originalEnv = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+    afterEach(() => {
+      // 恢复原始环境变量
+      process.env.NEXT_PUBLIC_API_BASE_URL = originalEnv;
+    });
+
+    it('应该使用环境变量中的API地址生成 WebSocket URL', () => {
+      // 设置测试环境变量
+      process.env.NEXT_PUBLIC_API_BASE_URL = 'http://localhost:8080/api';
+      
       // 准备测试数据
       const taskId = 'test-task';
       
-      // 执行测试（使用当前环境的 window.location）
+      // 执行测试
       const url = BacktestService.getWebSocketUrl(taskId);
 
       // 验证URL格式正确
-      expect(url).toMatch(/^wss?:\/\//); // 以 ws: 或 wss: 开头
-      expect(url).toContain('/ws/backtest/');
-      expect(url).toContain(taskId);
+      expect(url).toBe('ws://localhost:8080/ws/backtest/test-task');
+    });
+
+    it('应该在HTTPS环境下使用WSS协议', () => {
+      // 设置测试环境变量
+      process.env.NEXT_PUBLIC_API_BASE_URL = 'https://example.com/api';
+      
+      // 准备测试数据
+      const taskId = 'test-task';
+      
+      // 执行测试
+      const url = BacktestService.getWebSocketUrl(taskId);
+
+      // 验证使用WSS协议
+      expect(url).toBe('wss://example.com/ws/backtest/test-task');
+    });
+
+    it('应该使用默认地址当环境变量未设置时', () => {
+      // 清除环境变量
+      delete process.env.NEXT_PUBLIC_API_BASE_URL;
+      
+      // 准备测试数据
+      const taskId = 'test-task';
+      
+      // 执行测试
+      const url = BacktestService.getWebSocketUrl(taskId);
+
+      // 验证使用默认地址
+      expect(url).toBe('ws://localhost:8080/ws/backtest/test-task');
     });
 
     it('应该正确编码 taskId', () => {
-      // 准备测试数据
+      // 设置测试环境变量
+      process.env.NEXT_PUBLIC_API_BASE_URL = 'http://localhost:8080/api';
+      
+      // 准备测试数据（包含特殊字符）
       const taskId = 'task/with/slash';
 
       // 执行测试
@@ -256,6 +296,7 @@ describe('BacktestService', () => {
       // 验证 taskId 被正确编码
       expect(url).toContain(encodeURIComponent(taskId));
       expect(url).not.toContain('task/with/slash'); // 不应包含未编码的斜杠
+      expect(url).toBe('ws://localhost:8080/ws/backtest/task%2Fwith%2Fslash');
     });
   });
 });

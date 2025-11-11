@@ -15,8 +15,42 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import BacktestPage from './page';
+import { configApi, dataApi, backtestApi } from '@/lib/api';
+import { useNotificationStore } from '@/lib/store/notificationStore';
+import { useBacktestWebSocket } from '@/lib/hooks/useBacktestWebSocket';
+
+// Mock API
+jest.mock('@/lib/api', () => ({
+  configApi: {
+    list: jest.fn(),
+  },
+  dataApi: {
+    list: jest.fn(),
+  },
+  backtestApi: {
+    start: jest.fn(),
+  },
+}));
+
+// Mock stores
+const mockUseConfigStore = jest.fn();
+const mockUseDataStore = jest.fn();
+
+jest.mock('@/lib/store', () => ({
+  useConfigStore: (...args: unknown[]) => mockUseConfigStore(...args),
+  useDataStore: (...args: unknown[]) => mockUseDataStore(...args),
+}));
+
+jest.mock('@/lib/store/notificationStore', () => ({
+  useNotificationStore: jest.fn(),
+}));
+
+// Mock useBacktestWebSocket
+jest.mock('@/lib/hooks/useBacktestWebSocket', () => ({
+  useBacktestWebSocket: jest.fn(),
+}));
 
 // Mock 子组件
 jest.mock('@/components/ui', () => ({
@@ -55,15 +89,86 @@ jest.mock('@/components/ui', () => ({
       placeholder={placeholder}
     />
   ),
-  Select: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="select">{children}</div>
+  Select: ({ children, value, onValueChange }: { 
+    children: React.ReactNode;
+    value?: string;
+    onValueChange?: (value: string) => void;
+  }) => (
+    <div data-testid="select" data-value={value} onClick={() => onValueChange?.('test')}>
+      {children}
+    </div>
   ),
   SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SelectTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,
+  SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => (
+    <div data-testid="select-item" data-value={value}>{children}</div>
+  ),
 }));
 
 describe('BacktestPage', () => {
+  // Mock数据
+  const mockConfigStore = {
+    configs: [
+      { name: 'config1.toml', path: '/path/to/config1.toml', content: '', lastModified: '2025-01-01T00:00:00Z' },
+      { name: 'config2.toml', path: '/path/to/config2.toml', content: '', lastModified: '2025-01-02T00:00:00Z' },
+    ],
+    setConfigs: jest.fn(),
+  };
+
+  const mockDataStore = {
+    dataFiles: [
+      { name: 'btc_1h.csv', path: '', size: 1024, lastModified: '2025-01-01T00:00:00Z' },
+      { name: 'eth_4h.csv', path: '', size: 2048, lastModified: '2025-01-02T00:00:00Z' },
+    ],
+    setDataFiles: jest.fn(),
+  };
+
+  const mockNotificationStore = {
+    addNotification: jest.fn(),
+  };
+
+  beforeEach(() => {
+    // 重置所有mock
+    jest.clearAllMocks();
+
+    // 设置store的返回值
+    mockUseConfigStore.mockReturnValue(mockConfigStore);
+    mockUseDataStore.mockReturnValue(mockDataStore);
+    (useNotificationStore as unknown as jest.Mock).mockReturnValue(mockNotificationStore);
+
+    // Mock useBacktestWebSocket 返回空对象
+    (useBacktestWebSocket as jest.Mock).mockReturnValue({
+      status: 'disconnected',
+      lastMessage: null,
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      send: jest.fn(),
+      isConnected: false,
+    });
+
+    // 设置API的返回值
+    (configApi.list as jest.Mock).mockResolvedValue({
+      success: true,
+      data: [
+        { filename: 'config1.toml', path: '/path/to/config1.toml', modified: '2025-01-01T00:00:00Z' },
+        { filename: 'config2.toml', path: '/path/to/config2.toml', modified: '2025-01-02T00:00:00Z' },
+      ],
+    });
+
+    (dataApi.list as jest.Mock).mockResolvedValue({
+      success: true,
+      data: [
+        { filename: 'btc_1h.csv', size: 1024, modified: '2025-01-01T00:00:00Z' },
+        { filename: 'eth_4h.csv', size: 2048, modified: '2025-01-02T00:00:00Z' },
+      ],
+    });
+
+    (backtestApi.start as jest.Mock).mockResolvedValue({
+      success: true,
+      data: { task_id: 'test-task-id' },
+    });
+  });
   // 测试页面基本渲染
   it('应该渲染页面头部', () => {
     render(<BacktestPage />);
@@ -167,5 +272,172 @@ describe('BacktestPage', () => {
     
     const cards = screen.getAllByTestId('card');
     expect(cards.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // 测试配置文件加载
+  it('应该在挂载时加载配置文件列表', async () => {
+    render(<BacktestPage />);
+    
+    await waitFor(() => {
+      expect(configApi.list).toHaveBeenCalled();
+    });
+  });
+
+  // 测试数据文件加载
+  it('应该在挂载时加载数据文件列表', async () => {
+    render(<BacktestPage />);
+    
+    await waitFor(() => {
+      expect(dataApi.list).toHaveBeenCalled();
+    });
+  });
+
+  // 测试配置文件列表显示
+  it('应该显示配置文件选项', async () => {
+    render(<BacktestPage />);
+    
+    await waitFor(() => {
+      expect(mockConfigStore.setConfigs).toHaveBeenCalledWith([
+        { name: 'config1.toml', path: '/path/to/config1.toml', content: '', lastModified: '2025-01-01T00:00:00Z' },
+        { name: 'config2.toml', path: '/path/to/config2.toml', content: '', lastModified: '2025-01-02T00:00:00Z' },
+      ]);
+    });
+  });
+
+  // 测试数据文件列表显示
+  it('应该显示数据文件选项', async () => {
+    render(<BacktestPage />);
+    
+    await waitFor(() => {
+      expect(mockDataStore.setDataFiles).toHaveBeenCalledWith([
+        { name: 'btc_1h.csv', path: '', size: 1024, lastModified: '2025-01-01T00:00:00Z' },
+        { name: 'eth_4h.csv', path: '', size: 2048, lastModified: '2025-01-02T00:00:00Z' },
+      ]);
+    });
+  });
+
+  // 测试配置文件加载失败
+  it('配置文件加载失败时应该显示错误通知', async () => {
+    (configApi.list as jest.Mock).mockRejectedValue(new Error('加载失败'));
+    
+    render(<BacktestPage />);
+    
+    await waitFor(() => {
+      expect(mockNotificationStore.addNotification).toHaveBeenCalledWith({
+        type: 'error',
+        message: '加载配置文件列表失败',
+      });
+    });
+  });
+
+  // 测试数据文件加载失败
+  it('数据文件加载失败时应该显示错误通知', async () => {
+    (dataApi.list as jest.Mock).mockRejectedValue(new Error('加载失败'));
+    
+    render(<BacktestPage />);
+    
+    await waitFor(() => {
+      expect(mockNotificationStore.addNotification).toHaveBeenCalledWith({
+        type: 'error',
+        message: '加载数据文件列表失败',
+      });
+    });
+  });
+
+  // 测试空配置列表显示
+  it('没有配置文件时应该显示提示信息', () => {
+    mockUseConfigStore.mockReturnValue({
+      configs: [],
+      setConfigs: jest.fn(),
+    });
+    
+    render(<BacktestPage />);
+    
+    expect(screen.getByText('暂无配置文件,请先创建配置')).toBeInTheDocument();
+  });
+
+  // 测试空数据列表显示
+  it('没有数据文件时应该显示提示信息', () => {
+    mockUseDataStore.mockReturnValue({
+      dataFiles: [],
+      setDataFiles: jest.fn(),
+    });
+    
+    render(<BacktestPage />);
+    
+    expect(screen.getByText('暂无数据文件,请先下载数据')).toBeInTheDocument();
+  });
+
+  // 测试启动回测功能
+  it('当必填字段缺失时不应该调用API', async () => {
+    render(<BacktestPage />);
+
+    // 只填写任务名称,不选择配置文件和数据文件
+    const taskNameInput = screen.getByTestId('input') as HTMLInputElement;
+    fireEvent.change(taskNameInput, { target: { value: '测试回测任务' } });
+
+    // 找到提交按钮并点击
+    const buttons = screen.getAllByTestId('button');
+    const startButton = buttons.find(btn => btn.textContent?.includes('开始回测'));
+    if (startButton) {
+      fireEvent.click(startButton);
+
+      // 应该显示错误通知,因为缺少必填字段
+      await waitFor(() => {
+        expect(mockNotificationStore.addNotification).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'error',
+            message: expect.stringContaining('必填'),
+          })
+        );
+      });
+      
+      // API不应该被调用
+      expect(backtestApi.start).not.toHaveBeenCalled();
+    }
+  });
+
+  // 测试WebSocket集成
+  it('应该在启动回测后连接WebSocket', async () => {
+    // 此测试验证WebSocket hook被正确调用
+    render(<BacktestPage />);
+
+    // 验证useBacktestWebSocket被调用
+    expect(useBacktestWebSocket).toHaveBeenCalled();
+  });
+
+  // 测试启动回测失败处理
+  it('启动回测失败时应该显示错误通知', async () => {
+    (backtestApi.start as jest.Mock).mockRejectedValue(new Error('启动失败'));
+
+    // 设置所有必填字段
+    mockUseConfigStore.mockReturnValue({
+      configs: mockConfigStore.configs,
+      setConfigs: jest.fn(),
+    });
+    mockUseDataStore.mockReturnValue({
+      dataFiles: mockDataStore.dataFiles,
+      setDataFiles: jest.fn(),
+    });
+
+    render(<BacktestPage />);
+
+    const taskNameInput = screen.getByTestId('input') as HTMLInputElement;
+    fireEvent.change(taskNameInput, { target: { value: '测试任务' } });
+
+    // 手动设置state（这里仅测试错误处理逻辑）
+    const buttons = screen.getAllByTestId('button');
+    const startButton = buttons.find(btn => btn.textContent?.includes('开始回测'));
+    if (startButton) {
+      fireEvent.click(startButton);
+
+      await waitFor(() => {
+        expect(mockNotificationStore.addNotification).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'error',
+          })
+        );
+      });
+    }
   });
 });

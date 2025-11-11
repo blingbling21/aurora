@@ -647,4 +647,216 @@ describe('useBacktestWebSocket', () => {
       consoleErrorSpy.mockRestore();
     });
   });
+
+  describe('任务完成处理', () => {
+    it('应该在收到 final 消息后关闭连接且不重连', async () => {
+      // 准备回调函数
+      const onComplete = jest.fn();
+      const consoleLogSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
+
+      // 渲染 hook
+      const { result } = renderHook(() =>
+        useBacktestWebSocket('test-task', {
+          autoConnect: true,
+          onComplete,
+          reconnectInterval: 100,
+          maxReconnectAttempts: 3,
+        })
+      );
+
+      // 等待连接
+      act(() => {
+        jest.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(result.current.status).toBe('connected');
+      });
+
+      // 保存原始 WebSocket 实例用于验证
+      const originalWs = mockWebSocket;
+
+      // 模拟接收 final 消息
+      act(() => {
+        const message: WsMessage = {
+          type: 'final',
+          data: { result: 'success' },
+        };
+        mockWebSocket?.simulateMessage(message);
+      });
+
+      // 验证 onComplete 被调用
+      expect(onComplete).toHaveBeenCalledWith({ result: 'success' });
+
+      // 验证 WebSocket 已关闭
+      await waitFor(() => {
+        expect(originalWs?.readyState).toBe(MockWebSocket.CLOSED);
+      });
+
+      // 前进重连间隔时间,确认不会重连
+      act(() => {
+        jest.advanceTimersByTime(500);
+      });
+
+      // 验证没有创建新的 WebSocket 连接
+      expect(global.WebSocket).toHaveBeenCalledTimes(1);
+      
+      // 验证控制台输出了不重连的日志
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('任务已完成或手动断开,不再重连')
+      );
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('应该在 isTaskCompleted=true 时不连接', async () => {
+      // 渲染 hook with isTaskCompleted=true
+      const { result } = renderHook(() =>
+        useBacktestWebSocket('test-task', {
+          autoConnect: true,
+          isTaskCompleted: true,
+        })
+      );
+
+      // 等待一段时间
+      act(() => {
+        jest.advanceTimersByTime(500);
+      });
+
+      // 验证没有创建 WebSocket 连接
+      expect(global.WebSocket).not.toHaveBeenCalled();
+      expect(result.current.status).toBe('disconnected');
+    });
+
+    it('应该在 status_update 显示 completed 后不影响 final 消息处理', async () => {
+      // 准备回调函数
+      const onStatusUpdate = jest.fn();
+      const onComplete = jest.fn();
+
+      // 渲染 hook
+      renderHook(() =>
+        useBacktestWebSocket('test-task', {
+          autoConnect: true,
+          onStatusUpdate,
+          onComplete,
+        })
+      );
+
+      // 等待连接
+      act(() => {
+        jest.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(mockWebSocket?.readyState).toBe(MockWebSocket.OPEN);
+      });
+
+      // 模拟接收完成状态更新
+      act(() => {
+        const statusMessage: WsMessage = {
+          type: 'status_update',
+          progress: 100,
+          status: 'completed' as TaskStatus,
+        };
+        mockWebSocket?.simulateMessage(statusMessage);
+      });
+
+      // 验证状态更新回调被调用
+      expect(onStatusUpdate).toHaveBeenCalledWith(100, 'completed');
+
+      // 模拟接收 final 消息
+      act(() => {
+        const finalMessage: WsMessage = {
+          type: 'final',
+          data: { result: 'success' },
+        };
+        mockWebSocket?.simulateMessage(finalMessage);
+      });
+
+      // 验证完成回调被调用
+      expect(onComplete).toHaveBeenCalledWith({ result: 'success' });
+
+      // 验证 WebSocket 已关闭且不重连
+      await waitFor(() => {
+        expect(mockWebSocket?.readyState).toBe(MockWebSocket.CLOSED);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(500);
+      });
+
+      // 只创建了一次连接
+      expect(global.WebSocket).toHaveBeenCalledTimes(1);
+    });
+
+    it('应该在 taskId 变化时重置手动断开标志', async () => {
+      // 准备回调函数
+      const onComplete = jest.fn();
+
+      // 渲染 hook
+      const { rerender } = renderHook(
+        ({ taskId }) =>
+          useBacktestWebSocket(taskId, {
+            autoConnect: true,
+            onComplete,
+          }),
+        { initialProps: { taskId: 'task-1' } }
+      );
+
+      // 等待连接
+      act(() => {
+        jest.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(mockWebSocket?.readyState).toBe(MockWebSocket.OPEN);
+      });
+
+      // 模拟第一个任务完成
+      act(() => {
+        const message: WsMessage = {
+          type: 'final',
+          data: { result: 'success' },
+        };
+        mockWebSocket?.simulateMessage(message);
+      });
+
+      // 验证第一次完成
+      expect(onComplete).toHaveBeenCalledTimes(1);
+
+      await waitFor(() => {
+        expect(mockWebSocket?.readyState).toBe(MockWebSocket.CLOSED);
+      });
+
+      // 清除 mock 计数
+      jest.clearAllMocks();
+
+      // 更改 taskId,应该创建新连接
+      act(() => {
+        rerender({ taskId: 'task-2' });
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(100);
+      });
+
+      // 验证创建了新的 WebSocket 连接
+      await waitFor(() => {
+        expect(global.WebSocket).toHaveBeenCalled();
+      });
+
+      // 验证新任务也能正常接收 final 消息
+      act(() => {
+        const message: WsMessage = {
+          type: 'final',
+          data: { result: 'success-2' },
+        };
+        mockWebSocket?.simulateMessage(message);
+      });
+
+      expect(onComplete).toHaveBeenCalledWith({ result: 'success-2' });
+    });
+  });
 });
