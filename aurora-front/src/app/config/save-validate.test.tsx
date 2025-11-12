@@ -31,6 +31,7 @@ jest.mock('@/lib/api', () => ({
     update: jest.fn(),
     validate: jest.fn(),
     list: jest.fn(),
+    get: jest.fn(),
   },
 }));
 
@@ -39,6 +40,7 @@ jest.mock('@/lib/utils/toml', () => ({
   stringifyTOML: jest.fn(),
   validateTOML: jest.fn(),
   readTOMLFile: jest.fn(),
+  parseTOML: jest.fn(),
 }));
 
 // Mock 通知 store 的默认实现
@@ -487,6 +489,106 @@ describe('ConfigPage - 保存和验证功能', () => {
         const validateButton = screen.getAllByTestId('button').find((btn) => btn.textContent?.includes('✓ 验证'));
         expect(validateButton).toBeInTheDocument();
       }, { timeout: 3000 });
+    });
+  });
+
+  // 测试保存成功后编辑器关闭
+  describe('保存后编辑器状态', () => {
+    it('保存成功后应该关闭编辑器', async () => {
+      // Mock API 响应
+      (apiModule.configApi.list as jest.Mock).mockResolvedValue({
+        success: true,
+        data: [],
+      });
+      (apiModule.configApi.create as jest.Mock).mockResolvedValue({
+        success: true,
+      });
+      (tomlModule.stringifyTOML as jest.Mock).mockResolvedValue('# TOML content');
+
+      render(<ConfigPage />);
+
+      // 点击新建配置按钮打开编辑器
+      const newButtons = screen.getAllByTestId('button');
+      const newButton = newButtons.find((btn) => btn.textContent?.includes('新建配置'));
+      if (newButton) {
+        fireEvent.click(newButton);
+      }
+
+      // 等待编辑器打开
+      await waitFor(() => {
+        const saveButton = screen.getAllByTestId('button').find((btn) => btn.textContent?.includes('保存'));
+        expect(saveButton).toBeInTheDocument();
+      });
+
+      // 点击保存按钮
+      const saveButton = screen.getAllByTestId('button').find((btn) => btn.textContent?.includes('保存'));
+      if (saveButton) {
+        fireEvent.click(saveButton);
+      }
+
+      // 等待保存完成并验证编辑器关闭
+      await waitFor(() => {
+        // 编辑器关闭后应该显示提示信息
+        expect(screen.getByText('选择或创建一个配置文件以开始编辑')).toBeInTheDocument();
+      });
+
+      // 验证保存成功通知
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'success',
+          message: expect.stringContaining('配置保存成功'),
+        })
+      );
+    });
+
+    it('保存失败时编辑器应该保持打开', async () => {
+      // Mock API 响应失败
+      (apiModule.configApi.list as jest.Mock).mockResolvedValue({
+        success: true,
+        data: [],
+      });
+      (apiModule.configApi.create as jest.Mock).mockResolvedValue({
+        success: false,
+        error: '保存失败',
+      });
+      (tomlModule.stringifyTOML as jest.Mock).mockResolvedValue('# TOML content');
+
+      render(<ConfigPage />);
+
+      // 打开编辑器
+      const newButtons = screen.getAllByTestId('button');
+      const newButton = newButtons.find((btn) => btn.textContent?.includes('新建配置'));
+      if (newButton) {
+        fireEvent.click(newButton);
+      }
+
+      await waitFor(() => {
+        const saveButton = screen.getAllByTestId('button').find((btn) => btn.textContent?.includes('保存'));
+        expect(saveButton).toBeInTheDocument();
+      });
+
+      // 点击保存按钮
+      const saveButton = screen.getAllByTestId('button').find((btn) => btn.textContent?.includes('保存'));
+      if (saveButton) {
+        fireEvent.click(saveButton);
+      }
+
+      // 等待保存失败
+      await waitFor(() => {
+        expect(mockAddNotification).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'error',
+            message: expect.stringContaining('保存失败'),
+          })
+        );
+      });
+
+      // 验证编辑器仍然打开（保存按钮仍然存在）
+      const saveButtonAfterError = screen.getAllByTestId('button').find((btn) => btn.textContent?.includes('保存'));
+      expect(saveButtonAfterError).toBeInTheDocument();
+
+      // 不应该显示未编辑状态的提示
+      expect(screen.queryByText('选择或创建一个配置文件以开始编辑')).not.toBeInTheDocument();
     });
   });
 });

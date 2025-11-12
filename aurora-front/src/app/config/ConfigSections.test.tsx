@@ -171,9 +171,10 @@ describe('PortfolioSection', () => {
 
     render(<PortfolioSection config={mockConfig} onChange={mockOnChange} />);
 
-    // 找到启用风险管理按钮
-    const enableButton = screen.getByText(/启用风险管理/);
-    fireEvent.click(enableButton);
+    // 找到风险管理 Switch 开关 (第一个 switch 是风险管理)
+    const switches = screen.getAllByRole('switch');
+    const riskSwitch = switches[0]; // 第一个 switch 是风险管理
+    fireEvent.click(riskSwitch);
 
     expect(mockOnChange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -197,9 +198,10 @@ describe('PortfolioSection', () => {
 
     render(<PortfolioSection config={mockConfig} onChange={mockOnChange} />);
 
-    // 找到禁用风险管理按钮
-    const disableButton = screen.getByText(/禁用风险管理/);
-    fireEvent.click(disableButton);
+    // 找到风险管理 Switch 开关 (第一个 switch 是风险管理)
+    const switches = screen.getAllByRole('switch');
+    const riskSwitch = switches[0]; // 第一个 switch 是风险管理
+    fireEvent.click(riskSwitch);
 
     expect(mockOnChange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -244,9 +246,10 @@ describe('PortfolioSection', () => {
 
     render(<PortfolioSection config={mockConfig} onChange={mockOnChange} />);
 
-    // 找到启用仓位管理按钮
-    const enableButton = screen.getByText(/启用仓位管理/);
-    fireEvent.click(enableButton);
+    // 找到仓位管理 Switch 开关 (第二个 switch,第一个是风险管理)
+    const switches = screen.getAllByRole('switch');
+    const positionSizingSwitch = switches[1]; // 第二个 switch 是仓位管理
+    fireEvent.click(positionSizingSwitch);
 
     expect(mockOnChange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -351,8 +354,9 @@ describe('BacktestSection', () => {
 
     render(<BacktestSection config={undefined} onChange={mockOnChange} />);
 
-    expect(screen.getByText('回测配置未启用')).toBeInTheDocument();
-    expect(screen.getByText('+ 启用回测配置')).toBeInTheDocument();
+    // 检查 Switch 开关处于禁用状态
+    const switchElement = screen.getByRole('switch');
+    expect(switchElement).toHaveAttribute('data-state', 'unchecked');
   });
 
   // 测试启用回测配置
@@ -361,8 +365,9 @@ describe('BacktestSection', () => {
 
     render(<BacktestSection config={undefined} onChange={mockOnChange} />);
 
-    const enableButton = screen.getByText('+ 启用回测配置');
-    fireEvent.click(enableButton);
+    // 点击 Switch 开关启用回测配置
+    const switchElement = screen.getByRole('switch');
+    fireEvent.click(switchElement);
 
     expect(mockOnChange).toHaveBeenCalledWith({ data_path: '' });
   });

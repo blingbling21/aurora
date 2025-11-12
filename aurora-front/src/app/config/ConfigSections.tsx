@@ -19,7 +19,7 @@
  */
 
 import React from 'react';
-import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
+import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from '@/components/ui';
 import type {
   DataSourceConfig,
   StrategyConfig,
@@ -403,18 +403,26 @@ export function PortfolioSection({ config, onChange }: PortfolioSectionProps) {
       <div className="mt-6">
         <h5 className="text-sm font-semibold text-gray-700 mb-3 flex items-center justify-between">
           <span>风险管理配置 (可选)</span>
-          {!config.risk_rules && (
-            <button
-              onClick={() => updateField('risk_rules', {})}
-              className="text-xs text-blue-600 hover:underline"
-            >
-              + 启用风险管理
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">
+              {config.risk_rules ? '已启用' : '已禁用'}
+            </span>
+            <Switch
+              checked={!!config.risk_rules}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  // 启用风险管理,设置默认值
+                  updateField('risk_rules', {});
+                } else {
+                  // 禁用风险管理
+                  updateField('risk_rules', undefined);
+                }
+              }}
+            />
+          </div>
         </h5>
         {config.risk_rules && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   止损百分比 (%):
@@ -548,13 +556,6 @@ export function PortfolioSection({ config, onChange }: PortfolioSectionProps) {
                 <p className="text-xs text-gray-500 mt-1">账户权益低于此值时停止交易</p>
               </div>
             </div>
-            <button
-              onClick={() => updateField('risk_rules', undefined)}
-              className="text-xs text-red-600 hover:underline"
-            >
-              - 禁用风险管理
-            </button>
-          </>
         )}
       </div>
 
@@ -562,19 +563,26 @@ export function PortfolioSection({ config, onChange }: PortfolioSectionProps) {
       <div className="mt-6">
         <h5 className="text-sm font-semibold text-gray-700 mb-3 flex items-center justify-between">
           <span>仓位管理配置 (可选)</span>
-          {!config.position_sizing && (
-            <button
-              onClick={() =>
-                updateField('position_sizing', { strategy_type: 'fixed_percentage', percentage: 0.2 })
-              }
-              className="text-xs text-blue-600 hover:underline"
-            >
-              + 启用仓位管理
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">
+              {config.position_sizing ? '已启用' : '已禁用'}
+            </span>
+            <Switch
+              checked={!!config.position_sizing}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  // 启用仓位管理,设置默认策略
+                  updateField('position_sizing', { strategy_type: 'fixed_percentage', percentage: 0.2 });
+                } else {
+                  // 禁用仓位管理
+                  updateField('position_sizing', undefined);
+                }
+              }}
+            />
+          </div>
         </h5>
         {config.position_sizing && (
-          <>
+          <div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 仓位管理策略 *:
@@ -862,14 +870,7 @@ export function PortfolioSection({ config, onChange }: PortfolioSectionProps) {
                 </p>
               </div>
             )}
-
-            <button
-              onClick={() => updateField('position_sizing', undefined)}
-              className="text-xs text-red-600 hover:underline mt-4"
-            >
-              - 禁用仓位管理
-            </button>
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -959,10 +960,27 @@ export function BacktestSection({ config, onChange }: BacktestSectionProps) {
 
   return (
     <div>
-      <h4 className="text-base font-semibold text-blue-500 mb-3 pb-2 border-b">
-        回测配置 (可选)
+      <h4 className="text-base font-semibold text-blue-500 mb-3 pb-2 border-b flex items-center justify-between">
+        <span>回测配置 (可选)</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">
+            {config !== undefined ? '已启用' : '已禁用'}
+          </span>
+          <Switch
+            checked={config !== undefined}
+            onCheckedChange={(checked) => {
+              if (checked) {
+                // 启用回测配置,设置默认值
+                onChange({ data_path: '' });
+              } else {
+                // 禁用回测配置
+                onChange(undefined);
+              }
+            }}
+          />
+        </div>
       </h4>
-      {config !== undefined ? (
+      {config !== undefined && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1092,16 +1110,6 @@ export function BacktestSection({ config, onChange }: BacktestSectionProps) {
             </div>
           </div>
         </div>
-      ) : (
-        <div className="p-4 bg-gray-50 rounded">
-          <p className="text-sm text-gray-600 mb-2">回测配置未启用</p>
-          <button
-            onClick={() => onChange({ data_path: '' })}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            + 启用回测配置
-          </button>
-        </div>
       )}
     </div>
   );
@@ -1124,10 +1132,27 @@ export function LiveSection({ config, onChange }: LiveSectionProps) {
 
   return (
     <div>
-      <h4 className="text-base font-semibold text-blue-500 mb-3 pb-2 border-b">
-        实时交易配置 (可选)
+      <h4 className="text-base font-semibold text-blue-500 mb-3 pb-2 border-b flex items-center justify-between">
+        <span>实时交易配置 (可选)</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">
+            {config !== undefined ? '已启用' : '已禁用'}
+          </span>
+          <Switch
+            checked={config !== undefined}
+            onCheckedChange={(checked) => {
+              if (checked) {
+                // 启用实时交易配置,设置默认值
+                onChange({ symbol: '', interval: '1m', paper_trading: true });
+              } else {
+                // 禁用实时交易配置
+                onChange(undefined);
+              }
+            }}
+          />
+        </div>
       </h4>
-      {config !== undefined ? (
+      {config !== undefined && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1170,16 +1195,6 @@ export function LiveSection({ config, onChange }: LiveSectionProps) {
               <span className="ml-2 text-sm font-medium text-gray-700">模拟交易</span>
             </label>
           </div>
-        </div>
-      ) : (
-        <div className="p-4 bg-gray-50 rounded">
-          <p className="text-sm text-gray-600 mb-2">实时交易配置未启用</p>
-          <button
-            onClick={() => onChange({ symbol: '', interval: '1m', paper_trading: true })}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            + 启用实时交易配置
-          </button>
         </div>
       )}
     </div>

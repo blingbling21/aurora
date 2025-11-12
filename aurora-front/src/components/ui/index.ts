@@ -33,3 +33,4 @@ export {
   SelectTrigger,
   SelectValue,
 } from './select';
+export { Switch } from './switch';

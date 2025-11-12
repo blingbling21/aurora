@@ -199,6 +199,9 @@ export default function ConfigPage() {
         
         // 刷新配置列表
         setRefreshTrigger(prev => prev + 1);
+        
+        // 关闭编辑器
+        setIsEditing(false);
       } else {
         addNotification({
           type: 'error',
