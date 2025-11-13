@@ -23,14 +23,17 @@ export * from './client';
 export * from './config';
 export * from './data';
 export * from './backtest';
+export * from './dashboard';
 
 // 统一 API 对象
 import { configApi } from './config';
 import { dataApi } from './data';
 import { backtestApi } from './backtest';
+import { DashboardService } from './dashboard';
 
 export const api = {
   config: configApi,
   data: dataApi,
   backtest: backtestApi,
+  dashboard: DashboardService,
 };

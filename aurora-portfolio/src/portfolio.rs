@@ -112,6 +112,8 @@ pub struct BasePortfolio {
     position_manager: Option<PositionManager>,
     /// 当前持仓的入场价格（用于止损止盈计算）
     entry_price: Option<f64>,
+    /// 上次警告的回撤值（用于限制日志输出频率）
+    last_warned_drawdown: f64,
 }
 
 impl BasePortfolio {
@@ -141,6 +143,7 @@ impl BasePortfolio {
             risk_manager: None,
             position_manager: None,
             entry_price: None,
+            last_warned_drawdown: 0.0,
         }
     }
 
@@ -424,8 +427,10 @@ impl Portfolio for BasePortfolio {
         self.equity_curve.push(equity_point);
 
         // 如果回撤超过警告阈值，记录日志
-        if drawdown > 10.0 {
+        // 为避免大量日志输出影响性能，只有在回撤变化超过1%时才输出警告
+        if drawdown > 10.0 && (drawdown - self.last_warned_drawdown).abs() > 1.0 {
             warn!("当前回撤较大: {:.2}%", drawdown);
+            self.last_warned_drawdown = drawdown;
         }
     }
 

@@ -67,6 +67,7 @@ async fn main() -> std::io::Result<()> {
         .nest("/api/config", api::config::routes())
         .nest("/api/backtest", api::backtest::routes())
         .nest("/api/data", api::data::routes())
+        .nest("/api/dashboard", api::dashboard::routes())
         // WebSocket路由
         .nest("/ws", ws::routes())
         // 共享状态

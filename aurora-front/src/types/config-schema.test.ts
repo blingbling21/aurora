@@ -26,6 +26,7 @@ import {
   AuroraConfigSchema,
   BacktestSettingsSchema,
   PricingModeSchema,
+  BenchmarkConfigSchema,
   createDefaultAuroraConfig,
   createDefaultDataSourceConfig,
   createDefaultStrategyConfig,
@@ -354,6 +355,88 @@ describe('Config Schema', () => {
     it('应该接受undefined(可选)', () => {
       const result = BacktestSettingsSchema.safeParse(undefined);
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('BenchmarkConfigSchema', () => {
+    it('应该验证通过禁用的基准配置', () => {
+      const benchmark = {
+        enabled: false,
+      };
+
+      const result = BenchmarkConfigSchema.safeParse(benchmark);
+      expect(result.success).toBe(true);
+    });
+
+    it('应该验证通过启用且有数据路径的基准配置', () => {
+      const benchmark = {
+        enabled: true,
+        data_path: 'benchmark_btc_1h.csv',
+      };
+
+      const result = BenchmarkConfigSchema.safeParse(benchmark);
+      expect(result.success).toBe(true);
+    });
+
+    it('应该拒绝启用但没有数据路径的基准配置', () => {
+      const benchmark = {
+        enabled: true,
+      };
+
+      const result = BenchmarkConfigSchema.safeParse(benchmark);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain('启用基准时必须指定数据文件路径');
+      }
+    });
+
+    it('应该使用默认值', () => {
+      const benchmark = {};
+
+      const result = BenchmarkConfigSchema.parse(benchmark);
+      expect(result.enabled).toBe(false);
+    });
+  });
+
+  describe('BacktestSettings with Benchmark', () => {
+    it('应该验证通过带有基准配置的回测配置', () => {
+      const backtest = {
+        data_path: 'btc_1h.csv',
+        symbol: 'BTCUSDT',
+        interval: '1h',
+        benchmark: {
+          enabled: true,
+          data_path: 'benchmark_btc_1h.csv',
+        },
+      };
+
+      const result = BacktestSettingsSchema.safeParse(backtest);
+      expect(result.success).toBe(true);
+    });
+
+    it('应该验证通过不带基准配置的回测配置', () => {
+      const backtest = {
+        data_path: 'btc_1h.csv',
+        symbol: 'BTCUSDT',
+        interval: '1h',
+      };
+
+      const result = BacktestSettingsSchema.safeParse(backtest);
+      expect(result.success).toBe(true);
+    });
+
+    it('应该拒绝启用基准但无数据路径的配置', () => {
+      const backtest = {
+        data_path: 'btc_1h.csv',
+        symbol: 'BTCUSDT',
+        interval: '1h',
+        benchmark: {
+          enabled: true,
+        },
+      };
+
+      const result = BacktestSettingsSchema.safeParse(backtest);
+      expect(result.success).toBe(false);
     });
   });
 });

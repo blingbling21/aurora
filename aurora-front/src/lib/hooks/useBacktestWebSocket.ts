@@ -147,7 +147,6 @@ export function useBacktestWebSocket(
     (event: MessageEvent) => {
       try {
         const message = JSON.parse(event.data) as WsMessage;
-        console.log('📦 解析后的消息:', message); // 添加调试日志
         setLastMessage(message);
 
         // 调用通用消息处理器
@@ -156,17 +155,15 @@ export function useBacktestWebSocket(
         // 根据消息类型分发处理
         switch (message.type) {
           case 'connected':
-            console.log('✅ 收到连接确认消息');
             onConnected?.();
             break;
           case 'status_update':
-            console.log('📊 收到状态更新:', message.progress, message.status);
             if (message.progress !== undefined && message.status) {
               onStatusUpdate?.(message.progress, message.status);
             }
             break;
           case 'final':
-            console.log('🏁 收到最终消息，准备关闭连接');
+            console.log('🏁 回测任务完成');
             // 标记为手动断开,避免触发重连逻辑
             manualDisconnectRef.current = true;
             onComplete?.(message.data);
@@ -177,14 +174,14 @@ export function useBacktestWebSocket(
             }
             break;
           case 'error':
-            console.error('❌ 收到错误消息:', message.error || message.message);
+            console.error('❌ 回测错误:', message.error || message.message);
             onError?.(message.error || message.message || '未知错误');
             break;
           default:
             console.warn('⚠️  未知消息类型:', message.type);
         }
       } catch (error) {
-        console.error('❌ 解析 WebSocket 消息失败:', error, '原始数据:', event.data);
+        console.error('❌ 解析 WebSocket 消息失败:', error);
         onError?.('消息解析失败');
       }
     },
@@ -197,6 +194,7 @@ export function useBacktestWebSocket(
   const connect = useCallback(() => {
     // 如果没有任务 ID 或任务已完成，不连接
     if (!taskId || isTaskCompleted) {
+      console.log('⏭️  跳过连接: taskId=', taskId, 'isTaskCompleted=', isTaskCompleted);
       return;
     }
 
@@ -206,7 +204,15 @@ export function useBacktestWebSocket(
       (wsRef.current.readyState === WebSocket.CONNECTING ||
         wsRef.current.readyState === WebSocket.OPEN)
     ) {
+      console.log('⏭️  跳过连接: WebSocket已存在,状态=', wsRef.current.readyState);
       return;
+    }
+
+    // 清理旧的连接
+    if (wsRef.current) {
+      console.log('🧹 清理旧的WebSocket连接');
+      wsRef.current.close(1000, 'Reconnecting');
+      wsRef.current = null;
     }
 
     setStatus('connecting');
@@ -216,21 +222,20 @@ export function useBacktestWebSocket(
     const attemptConnect = () => {
       try {
         const url = backtestApi.getWebSocketUrl(taskId);
-        console.log('尝试连接 WebSocket:', url); // 添加调试日志
+        console.log('🔌 尝试连接 WebSocket:', url);
         const ws = new WebSocket(url);
         wsRef.current = ws;
 
         // 连接打开
         ws.onopen = () => {
-          console.log('✅ WebSocket 已连接');
+          console.log('✅ 回测WebSocket已连接');
           setStatus('connected');
           reconnectCountRef.current = 0;
           startHeartbeat();
         };
 
-        // 接收消息
+        // 接收消息 (不打印每条消息,减少日志噪音)
         ws.onmessage = (event) => {
-          console.log('📨 收到 WebSocket 消息:', event.data); // 添加调试日志
           handleMessage(event);
         };
 
@@ -243,7 +248,7 @@ export function useBacktestWebSocket(
 
         // 连接关闭
         ws.onclose = (event) => {
-          console.log('WebSocket 已关闭. Code:', event.code, 'Reason:', event.reason);
+          console.log('🔌 回测WebSocket已关闭, Code:', event.code, 'Reason:', event.reason);
           setStatus('disconnected');
           clearHeartbeat();
           wsRef.current = null;
@@ -327,25 +332,39 @@ export function useBacktestWebSocket(
   // 自动连接
   useEffect(() => {
     if (autoConnect && taskId && !isTaskCompleted) {
-      // 当 taskId 变化时,重置手动断开标志
+      // 当 taskId 变化时,先断开旧连接
+      if (wsRef.current) {
+        wsRef.current.close(1000, 'Task changed');
+        wsRef.current = null;
+      }
+      
+      // 清理重连定时器
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      
+      // 重置手动断开标志
       manualDisconnectRef.current = false;
       
-      // 使用 setTimeout 避免在 effect 中同步调用 setState
+      // 延迟连接,确保旧连接已完全清理
       const timer = setTimeout(() => {
         connect();
-      }, 0);
+      }, 100);
 
       // 清理函数
       return () => {
         clearTimeout(timer);
         disconnect();
       };
-    } else {
-      // 清理函数
-      return () => {
-        disconnect();
-      };
     }
+    
+    // 如果没有 taskId 或任务已完成,断开连接
+    return () => {
+      disconnect();
+    };
+    // 只依赖 taskId, autoConnect 和 isTaskCompleted
+    // connect 和 disconnect 是稳定的函数,不需要作为依赖
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, autoConnect, isTaskCompleted]);
 

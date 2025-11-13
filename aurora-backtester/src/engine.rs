@@ -23,6 +23,7 @@ use tracing::{debug, error, info};
 // 在库内部使用相对路径
 use crate::pricing_mode::PricingMode;
 use crate::result::BacktestResult;
+use crate::time_utils::{parse_date_to_timestamp, validate_time_range, format_timestamp, TimeRangeValidation};
 
 /// 运行回测
 pub async fn run_backtest(
@@ -33,13 +34,69 @@ pub async fn run_backtest(
     portfolio_config: &PortfolioConfig,
     pricing_mode_config: Option<&aurora_config::PricingModeConfig>,
 ) -> Result<BacktestResult> {
+    run_backtest_with_progress::<fn(u8)>(
+        data_path,
+        strategy_name,
+        short_period,
+        long_period,
+        portfolio_config,
+        pricing_mode_config,
+        None,
+        None,
+        None,
+        false, // 默认禁用基准回测
+    )
+    .await
+}
+
+/// 运行回测（支持进度回调和时间范围）
+pub async fn run_backtest_with_progress<F>(
+    data_path: &str,
+    strategy_name: &str,
+    short_period: usize,
+    long_period: usize,
+    portfolio_config: &PortfolioConfig,
+    pricing_mode_config: Option<&aurora_config::PricingModeConfig>,
+    progress_callback: Option<F>,
+    start_time: Option<&str>,
+    end_time: Option<&str>,
+    enable_benchmark: bool,
+) -> Result<BacktestResult>
+where
+    F: Fn(u8) + Send + Sync,
+{
     // 验证数据文件是否存在
     if !Path::new(data_path).exists() {
         return Err(anyhow!("数据文件不存在: {}", data_path));
     }
 
     info!("加载数据文件: {}", data_path);
-    let klines = load_klines_from_csv(data_path)?;
+    
+    // 解析时间范围
+    let start_timestamp = if let Some(start_str) = start_time {
+        Some(parse_date_to_timestamp(start_str)?)
+    } else {
+        None
+    };
+    
+    let end_timestamp = if let Some(end_str) = end_time {
+        Some(parse_date_to_timestamp(end_str)?)
+    } else {
+        None
+    };
+    
+    // 加载并过滤数据
+    let klines = load_klines_from_csv_with_filter(data_path, start_timestamp, end_timestamp)?;
+    
+    if let (Some(start), Some(end)) = (start_timestamp, end_timestamp) {
+        info!(
+            "应用时间过滤: {} 到 {}, 过滤后数据: {} 条",
+            format_timestamp(start),
+            format_timestamp(end),
+            klines.len()
+        );
+    }
+    
     info!("成功加载 {} 条K线数据", klines.len());
 
     if klines.is_empty() {
@@ -62,13 +119,34 @@ pub async fn run_backtest(
 
     // 创建回测引擎并运行
     let mut engine = BacktestEngine::with_pricing_mode(strategy, portfolio_config, pricing_mode)?;
-    let result = engine.run(&klines, Some(data_path.to_string())).await?;
+    let result = engine
+        .run_with_progress(&klines, Some(data_path.to_string()), progress_callback, enable_benchmark)
+        .await?;
 
     Ok(result)
 }
 
 /// 从CSV文件加载K线数据
 fn load_klines_from_csv(file_path: &str) -> Result<Vec<Kline>> {
+    load_klines_from_csv_with_filter(file_path, None, None)
+}
+
+/// 从CSV文件加载K线数据（支持时间范围过滤）
+///
+/// # 参数
+///
+/// * `file_path` - CSV文件路径
+/// * `start_time` - 开始时间戳（毫秒，可选）
+/// * `end_time` - 结束时间戳（毫秒，可选）
+///
+/// # 返回值
+///
+/// 返回过滤后的K线数据，并进行时间范围验证
+fn load_klines_from_csv_with_filter(
+    file_path: &str,
+    start_time: Option<i64>,
+    end_time: Option<i64>,
+) -> Result<Vec<Kline>> {
     let mut reader = csv::Reader::from_path(file_path)?;
     let mut klines = Vec::new();
 
@@ -84,6 +162,73 @@ fn load_klines_from_csv(file_path: &str) -> Result<Vec<Kline>> {
 
     // 按时间戳排序
     klines.sort_by_key(|k: &Kline| k.timestamp);
+
+    // 如果没有数据，直接返回
+    if klines.is_empty() {
+        return Ok(klines);
+    }
+
+    // 获取原始数据的时间范围
+    let data_start = klines.first().unwrap().timestamp;
+    let data_end = klines.last().unwrap().timestamp;
+
+    // 验证时间范围
+    if start_time.is_some() || end_time.is_some() {
+        let validation = validate_time_range(start_time, end_time, data_start, data_end);
+        
+        match validation {
+            TimeRangeValidation::Valid => {
+                // 有效，继续执行
+            }
+            TimeRangeValidation::NoOverlap { config_start, config_end, data_start, data_end } => {
+                return Err(anyhow!(
+                    "配置的时间范围与数据完全不重叠！\n\
+                     配置范围: {} 到 {}\n\
+                     数据范围: {} 到 {}",
+                    format_timestamp(config_start),
+                    format_timestamp(config_end),
+                    format_timestamp(data_start),
+                    format_timestamp(data_end)
+                ));
+            }
+            TimeRangeValidation::StartBeforeData { config_start, data_start } => {
+                info!(
+                    "警告: 配置的开始时间 {} 早于数据开始时间 {}，将使用数据开始时间",
+                    format_timestamp(config_start),
+                    format_timestamp(data_start)
+                );
+            }
+            TimeRangeValidation::EndAfterData { config_end, data_end } => {
+                info!(
+                    "警告: 配置的结束时间 {} 晚于数据结束时间 {}，将使用数据结束时间",
+                    format_timestamp(config_end),
+                    format_timestamp(data_end)
+                );
+            }
+            TimeRangeValidation::InvalidRange { start, end } => {
+                return Err(anyhow!(
+                    "无效的时间范围: 开始时间 {} 晚于结束时间 {}",
+                    format_timestamp(start),
+                    format_timestamp(end)
+                ));
+            }
+        }
+    }
+
+    // 应用时间过滤
+    if start_time.is_some() || end_time.is_some() {
+        let filter_start = start_time.unwrap_or(i64::MIN);
+        let filter_end = end_time.unwrap_or(i64::MAX);
+        
+        klines.retain(|k| k.timestamp >= filter_start && k.timestamp <= filter_end);
+        
+        info!(
+            "时间范围过滤: {} 到 {}, 保留 {} 条数据",
+            format_timestamp(filter_start.max(data_start)),
+            format_timestamp(filter_end.min(data_end)),
+            klines.len()
+        );
+    }
 
     Ok(klines)
 }
@@ -173,7 +318,40 @@ impl BacktestEngine {
     ///
     /// * `klines` - K线数据
     /// * `data_path` - 数据文件路径（可选）
-    pub async fn run(&mut self, klines: &[Kline], data_path: Option<String>) -> Result<BacktestResult> {
+    /// 运行回测
+    ///
+    /// # 参数
+    /// * `klines` - K线数据
+    /// * `data_path` - 数据文件路径（可选）
+    /// * `enable_benchmark` - 是否启用基准回测（Buy & Hold策略）
+    ///
+    /// # 返回
+    /// * 回测结果
+    pub async fn run(&mut self, klines: &[Kline], data_path: Option<String>, enable_benchmark: bool) -> Result<BacktestResult> {
+        self.run_with_progress(klines, data_path, None::<fn(u8)>, enable_benchmark).await
+    }
+
+    /// 运行回测（支持进度回调）
+    ///
+    /// # 参数
+    /// 运行回测（支持进度回调）
+    ///
+    /// # 参数
+    ///
+    /// * `klines` - K线数据
+    /// * `data_path` - 数据文件路径（可选）
+    /// * `progress_callback` - 进度回调函数，参数为进度百分比(0-100)
+    /// * `enable_benchmark` - 是否启用基准回测（Buy & Hold策略）
+    pub async fn run_with_progress<F>(
+        &mut self,
+        klines: &[Kline],
+        data_path: Option<String>,
+        progress_callback: Option<F>,
+        enable_benchmark: bool,
+    ) -> Result<BacktestResult>
+    where
+        F: Fn(u8) + Send + Sync,
+    {
         info!(
             "开始回测，数据时间范围: {} - {}",
             klines.first().map(|k| k.timestamp).unwrap_or(0),
@@ -182,6 +360,7 @@ impl BacktestEngine {
 
         let mut processed_count = 0;
         let total_count = klines.len();
+        let mut last_reported_progress: u8 = 0;
 
         for kline in klines {
             // 创建市场事件
@@ -279,7 +458,26 @@ impl BacktestEngine {
 
             processed_count += 1;
 
-            // 每处理10%的数据输出一次进度
+            // 计算当前进度(保持为浮点数以获得更高精度)
+            let current_progress_f64 = (processed_count as f64 / total_count as f64) * 100.0;
+            let current_progress = (current_progress_f64 as u8).min(100);
+            
+            // 定期回调进度,而不是只在进度变化时回调
+            // 这样可以确保前端定期接收到进度更新,即使进度值没有变化
+            // 每处理 1% 的数据或者至少每处理 100 条数据时回调一次
+            let progress_interval = (total_count / 100).max(100);
+            if processed_count % progress_interval == 0 || current_progress > last_reported_progress {
+                last_reported_progress = current_progress;
+                if let Some(ref callback) = progress_callback {
+                    callback(current_progress);
+                }
+                
+                // 每次回调进度时让出控制权，允许其他异步任务运行
+                // 这确保 WebSocket 消息能及时发送，不会被阻塞
+                tokio::task::yield_now().await;
+            }
+
+            // 每处理10%的数据输出一次进度日志
             if processed_count % (total_count / 10).max(1) == 0 {
                 let progress = (processed_count as f64 / total_count as f64) * 100.0;
                 let current_equity = self.portfolio.get_total_equity(kline.close);
@@ -320,36 +518,50 @@ impl BacktestEngine {
         let equity_curve = self.portfolio.get_equity_curve().to_vec();
         let trades = self.portfolio.get_trades().to_vec();
 
-        //运行基准策略回测（Buy & Hold）
-        info!("开始运行基准策略（Buy & Hold）回测...");
-        let benchmark_result = self.run_benchmark(klines, initial_equity).await?;
-        
-        // 计算 Alpha
-        let benchmark_return = benchmark_result.metrics.total_return;
-        let alpha = PortfolioAnalytics::calculate_alpha(metrics.total_return, benchmark_return);
-        let annualized_alpha = PortfolioAnalytics::calculate_annualized_alpha(
-            metrics.total_return,
-            benchmark_return,
-            time_period_days,
-        );
-        
-        info!(
-            "基准收益率: {:.2}%, 策略收益率: {:.2}%, Alpha: {:.2}%, 年化Alpha: {:.2}%",
-            benchmark_return, metrics.total_return, alpha, annualized_alpha
-        );
+        // 根据配置决定是否运行基准策略回测（Buy & Hold）
+        let result = if enable_benchmark {
+            info!("开始运行基准策略（Buy & Hold）回测...");
+            let benchmark_result = self.run_benchmark(klines, initial_equity).await?;
+            
+            // 计算 Alpha
+            let benchmark_return = benchmark_result.metrics.total_return;
+            let alpha = PortfolioAnalytics::calculate_alpha(metrics.total_return, benchmark_return);
+            let annualized_alpha = PortfolioAnalytics::calculate_annualized_alpha(
+                metrics.total_return,
+                benchmark_return,
+                time_period_days,
+            );
+            
+            info!(
+                "基准收益率: {:.2}%, 策略收益率: {:.2}%, Alpha: {:.2}%, 年化Alpha: {:.2}%",
+                benchmark_return, metrics.total_return, alpha, annualized_alpha
+            );
 
-        // 创建并返回包含基准数据的结果
-        let result = BacktestResult::new_with_benchmark(
-            metrics,
-            equity_curve,
-            trades,
-            time_period_days,
-            initial_equity,
-            final_equity,
-            data_path,
-            benchmark_result.equity_curve,
-            benchmark_return,
-        );
+            // 创建并返回包含基准数据的结果
+            BacktestResult::new_with_benchmark(
+                metrics,
+                equity_curve,
+                trades,
+                time_period_days,
+                initial_equity,
+                final_equity,
+                data_path,
+                benchmark_result.equity_curve,
+                benchmark_return,
+            )
+        } else {
+            info!("基准回测已禁用，跳过 Buy & Hold 策略");
+            // 创建并返回不含基准数据的结果
+            BacktestResult::new(
+                metrics,
+                equity_curve,
+                trades,
+                time_period_days,
+                initial_equity,
+                final_equity,
+                data_path,
+            )
+        };
 
         Ok(result)
     }
@@ -485,7 +697,8 @@ mod tests {
         let portfolio_config = create_test_portfolio_config();
         let mut engine = BacktestEngine::new(strategy, &portfolio_config).unwrap();
 
-        let result = engine.run(&klines, None).await;
+        // 测试时禁用基准回测以提高测试速度
+        let result = engine.run(&klines, None, false).await;
         assert!(result.is_ok());
         
         let backtest_result = result.unwrap();

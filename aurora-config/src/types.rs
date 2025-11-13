@@ -282,6 +282,34 @@ pub struct BacktestConfig {
     /// 定价模式配置(可选)
     #[serde(default)]
     pub pricing_mode: Option<PricingModeConfig>,
+
+    /// 基准配置(可选)
+    #[serde(default)]
+    pub benchmark: Option<BenchmarkConfig>,
+}
+
+/// 基准配置
+///
+/// 用于配置回测基准对比
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BenchmarkConfig {
+    /// 是否启用基准
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// 基准数据文件路径(启用时必填)
+    #[serde(default)]
+    pub data_path: Option<String>,
+}
+
+impl BenchmarkConfig {
+    /// 验证配置是否有效
+    pub fn validate(&self) -> Result<(), String> {
+        if self.enabled && self.data_path.is_none() {
+            return Err("启用基准时必须指定数据文件路径".to_string());
+        }
+        Ok(())
+    }
 }
 
 /// 定价模式配置

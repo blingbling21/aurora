@@ -17,15 +17,6 @@ initial_cash = 10_000
 commission = 0.001
 slippage = 0.0005
 
-  [portfolio.risk_rules]
-  max_drawdown_pct = 15
-  max_daily_loss_pct = 5
-  max_consecutive_losses = 3
-  max_single_trade_loss_pct = 3
-  min_equity = 5_000
-  stop_loss_pct = 2
-  take_profit_pct = 5
-
   [portfolio.position_sizing]
   strategy_type = "fixed_percentage"
   percentage = 0.2

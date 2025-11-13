@@ -1,0 +1,37 @@
+# 回测配置示例 - 禁用基准配置
+
+[data_source]
+provider = "binance"
+timeout = 30
+max_retries = 3
+
+[[strategies]]
+name = "MA交叉策略"
+strategy_type = "ma-crossover"
+enabled = true
+
+[strategies.parameters]
+short_period = 5
+long_period = 20
+
+[portfolio]
+initial_cash = 10000.0
+commission = 0.001
+slippage = 0.0
+
+[logging]
+level = "info"
+format = "pretty"
+
+[backtest]
+data_path = "binance_btcusdt_1m_20250101_to_20251113.csv"
+symbol = "BTCUSDT"
+interval = "1m"
+
+# 定价模式配置
+[backtest.pricing_mode]
+mode = "close"
+
+# 基准配置 - 禁用示例
+[backtest.benchmark]
+enabled = false

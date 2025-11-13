@@ -121,6 +121,7 @@ mod tests {
             start_time: Some("2024-01-01".to_string()),
             end_time: Some("2024-12-31".to_string()),
             pricing_mode: None,
+            benchmark: None,
         };
 
         assert_eq!(config.data_path, "data.csv");
@@ -459,5 +460,83 @@ mod tests {
             }
             _ => panic!("Expected FixedPercentage"),
         }
+    }
+
+    #[test]
+    fn test_benchmark_config_disabled() {
+        let benchmark = BenchmarkConfig {
+            enabled: false,
+            data_path: None,
+        };
+        assert!(benchmark.validate().is_ok());
+    }
+
+    #[test]
+    fn test_benchmark_config_enabled_with_path() {
+        let benchmark = BenchmarkConfig {
+            enabled: true,
+            data_path: Some("benchmark_btc_1h.csv".to_string()),
+        };
+        assert!(benchmark.validate().is_ok());
+    }
+
+    #[test]
+    fn test_benchmark_config_enabled_without_path() {
+        let benchmark = BenchmarkConfig {
+            enabled: true,
+            data_path: None,
+        };
+        let result = benchmark.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("启用基准时必须指定数据文件路径"));
+    }
+
+    #[test]
+    fn test_backtest_config_with_benchmark() {
+        let toml_str = r#"
+            data_path = "btc_1h.csv"
+            symbol = "BTCUSDT"
+            interval = "1h"
+
+            [benchmark]
+            enabled = true
+            data_path = "benchmark_btc_1h.csv"
+        "#;
+
+        let config: BacktestConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.data_path, "btc_1h.csv");
+        assert!(config.benchmark.is_some());
+
+        let benchmark = config.benchmark.unwrap();
+        assert_eq!(benchmark.enabled, true);
+        assert_eq!(benchmark.data_path, Some("benchmark_btc_1h.csv".to_string()));
+        assert!(benchmark.validate().is_ok());
+    }
+
+    #[test]
+    fn test_backtest_config_without_benchmark() {
+        let toml_str = r#"
+            data_path = "btc_1h.csv"
+            symbol = "BTCUSDT"
+            interval = "1h"
+        "#;
+
+        let config: BacktestConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.data_path, "btc_1h.csv");
+        assert!(config.benchmark.is_none());
+    }
+
+    #[test]
+    fn test_benchmark_config_serialization() {
+        let benchmark = BenchmarkConfig {
+            enabled: true,
+            data_path: Some("benchmark.csv".to_string()),
+        };
+
+        let toml_str = toml::to_string(&benchmark).unwrap();
+        let deserialized: BenchmarkConfig = toml::from_str(&toml_str).unwrap();
+
+        assert_eq!(deserialized.enabled, benchmark.enabled);
+        assert_eq!(deserialized.data_path, benchmark.data_path);
     }
 }

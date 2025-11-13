@@ -228,6 +228,30 @@ export type PricingMode = z.infer<typeof PricingModeSchema>;
 // ==================== 回测配置 ====================
 
 /**
+ * 基准配置Schema
+ */
+export const BenchmarkConfigSchema = z.object({
+  // 是否启用基准
+  enabled: z.boolean().default(false),
+  // 基准数据文件路径(启用时必填)
+  data_path: z.string().optional(),
+}).refine(
+  (data) => {
+    // 如果启用，则 data_path 必填
+    if (data.enabled && !data.data_path) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: '启用基准时必须指定数据文件路径',
+    path: ['data_path'],
+  }
+);
+
+export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
+
+/**
  * 回测配置Schema
  */
 export const BacktestSettingsSchema = z.object({
@@ -243,6 +267,8 @@ export const BacktestSettingsSchema = z.object({
   end_time: z.string().optional(),
   // 定价模式配置(可选)
   pricing_mode: PricingModeSchema,
+  // 基准配置(可选)
+  benchmark: BenchmarkConfigSchema.optional(),
 }).optional();
 
 export type BacktestSettings = z.infer<typeof BacktestSettingsSchema>;

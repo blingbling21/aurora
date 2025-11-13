@@ -310,3 +310,13 @@ export const DashboardStatsSchema = z.object({
 });
 
 export type DashboardStats = z.infer<typeof DashboardStatsSchema>;
+
+/**
+ * 仪表板数据 Schema（包含统计和最近任务）
+ */
+export const DashboardDataSchema = z.object({
+  stats: DashboardStatsSchema,
+  recent_tasks: z.array(BacktestTaskSchema),
+});
+
+export type DashboardData = z.infer<typeof DashboardDataSchema>;

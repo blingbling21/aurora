@@ -21,6 +21,7 @@ use tracing::{error, info};
 mod pricing_mode;
 mod result;
 mod engine;
+mod time_utils;
 
 #[derive(Parser)]
 #[command(name = "aurora-backtester")]

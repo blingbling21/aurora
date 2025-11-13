@@ -45,6 +45,8 @@ export default function BacktestPage() {
   const [taskName, setTaskName] = useState('');
   const [selectedConfig, setSelectedConfig] = useState('');
   const [selectedData, setSelectedData] = useState('');
+  const [selectedBenchmark, setSelectedBenchmark] = useState<string>('disabled');
+  const [benchmarkEnabled, setBenchmarkEnabled] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [progressMessage, setProgressMessage] = useState('');
   // 任务完成状态,用于防止WebSocket重连
@@ -60,7 +62,7 @@ export default function BacktestPage() {
     autoConnect: true,
     isTaskCompleted,
     onConnected: () => {
-      console.log('WebSocket已连接,等待回测进度更新');
+      // WebSocket已连接
     },
     onStatusUpdate: (progressValue, status) => {
       // 更新进度条
@@ -85,9 +87,8 @@ export default function BacktestPage() {
         }
       }
     },
-    onComplete: (data) => {
+    onComplete: () => {
       // 收到final消息,任务已结束
-      console.log('回测任务已完成,数据:', data);
       setIsRunning(false);
       setIsTaskCompleted(true);
       setProgressMessage('任务已结束');
@@ -156,6 +157,39 @@ export default function BacktestPage() {
     loadDataFiles();
   }, [setConfigs, setDataFiles, addNotification]);
 
+  // 监听配置文件选择变化,自动加载基准配置
+  useEffect(() => {
+    if (!selectedConfig) {
+      setBenchmarkEnabled(false);
+      setSelectedBenchmark('disabled');
+      return;
+    }
+
+    const loadConfigBenchmark = async () => {
+      try {
+        const response = await configApi.get(selectedConfig);
+        if (response.success && response.data) {
+          // 解析TOML内容获取基准配置
+          const { validateTOML } = await import('@/lib/utils/toml');
+          const result = await validateTOML(response.data);
+          
+          if (result.valid && result.config?.backtest?.benchmark) {
+            const benchmark = result.config.backtest.benchmark;
+            setBenchmarkEnabled(benchmark.enabled || false);
+            setSelectedBenchmark(benchmark.enabled && benchmark.data_path ? benchmark.data_path : 'disabled');
+          } else {
+            setBenchmarkEnabled(false);
+            setSelectedBenchmark('disabled');
+          }
+        }
+      } catch (error) {
+        console.error('加载配置文件基准设置失败:', error);
+      }
+    };
+
+    loadConfigBenchmark();
+  }, [selectedConfig]);
+
   /**
    * 处理启动回测
    */
@@ -172,11 +206,17 @@ export default function BacktestPage() {
     }
 
     try {
-      // 设置运行状态并重置完成标志
-      setIsRunning(true);
+      // 清理之前的任务ID和状态，避免WebSocket连接错误
+      setCurrentTaskId(null);
       setIsTaskCompleted(false);
       setProgress(0);
       setProgressMessage('准备启动回测...');
+      
+      // 等待一小段时间,确保之前的WebSocket连接已经断开
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // 设置运行状态
+      setIsRunning(true);
 
       // 调用API启动回测任务
       const response = await backtestApi.start({
@@ -313,6 +353,37 @@ export default function BacktestPage() {
                 )}
               </SelectContent>
             </Select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              基准数据文件:
+            </label>
+            <Select 
+              value={selectedBenchmark}
+              onValueChange={(value) => {
+                setSelectedBenchmark(value);
+                setBenchmarkEnabled(value !== 'disabled');
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="-- 请选择 --" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="disabled">禁用</SelectItem>
+                {dataFiles.map((file) => (
+                  <SelectItem key={file.name} value={file.name}>
+                    {file.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500 mt-1">
+              {benchmarkEnabled 
+                ? `已启用基准对比: ${selectedBenchmark}`
+                : '当前未启用基准对比'
+              }
+            </p>
           </div>
 
           <div className="flex gap-3">

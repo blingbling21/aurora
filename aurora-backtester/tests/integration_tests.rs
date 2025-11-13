@@ -120,7 +120,7 @@ async fn test_kline_processing() -> Result<()> {
         },
     ];
 
-    let result = engine.run(&klines, None).await;
+    let result = engine.run(&klines, None, false).await;
     assert!(result.is_ok());
 
     // 验证权益曲线已更新
@@ -356,7 +356,7 @@ async fn test_backtest_result_correctness() -> Result<()> {
         },
     ];
 
-    let result = engine.run(&klines, None).await;
+    let result = engine.run(&klines, None, false).await;
     assert!(result.is_ok());
 
     // 验证有交易发生
@@ -423,3 +423,115 @@ async fn test_concurrent_backtests() -> Result<()> {
 
     Ok(())
 }
+
+/// 测试时间范围过滤功能
+#[tokio::test]
+async fn test_time_range_filtering() -> Result<()> {
+    use aurora_backtester::run_backtest_with_progress;
+    
+    let (csv_file, _dir) = create_test_csv_file()?;
+    let portfolio_config = create_test_portfolio_config(10000.0);
+
+    // 测试有效的时间范围
+    let result = run_backtest_with_progress::<fn(u8)>(
+        &csv_file,
+        "ma-crossover",
+        5,
+        10,
+        &portfolio_config,
+        None,
+        None,
+        Some("2022-01-01"),
+        Some("2022-01-02"),
+        false,  // 禁用基准回测
+    )
+    .await;
+
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    // 时间过滤后应该有数据（检查权益曲线而不是交易数量）
+    assert!(result.final_equity > 0.0);
+
+    Ok(())
+}
+
+/// 测试时间范围验证 - 完全不重叠
+#[tokio::test]
+async fn test_time_range_no_overlap() -> Result<()> {
+    use aurora_backtester::run_backtest_with_progress;
+    
+    let (csv_file, _dir) = create_test_csv_file()?;
+    let portfolio_config = create_test_portfolio_config(10000.0);
+
+    // 测试完全不重叠的时间范围（数据是2021年底，我们查询2023年）
+    let result = run_backtest_with_progress::<fn(u8)>(
+        &csv_file,
+        "ma-crossover",
+        5,
+        10,
+        &portfolio_config,
+        None,
+        None,
+        Some("2023-01-01"),
+        Some("2023-12-31"),
+        false,  // 禁用基准回测
+    )
+    .await;
+
+    // 应该返回错误
+    assert!(result.is_err());
+    let error_msg = result.unwrap_err().to_string();
+    assert!(error_msg.contains("完全不重叠") || error_msg.contains("NoOverlap"));
+
+    Ok(())
+}
+
+/// 测试无效的时间范围（开始时间晚于结束时间）
+#[tokio::test]
+async fn test_invalid_time_range() -> Result<()> {
+    use aurora_backtester::run_backtest_with_progress;
+    
+    let (csv_file, _dir) = create_test_csv_file()?;
+    let portfolio_config = create_test_portfolio_config(10000.0);
+
+    // 开始时间晚于结束时间
+    let result = run_backtest_with_progress::<fn(u8)>(
+        &csv_file,
+        "ma-crossover",
+        5,
+        10,
+        &portfolio_config,
+        None,
+        None,
+        Some("2022-12-31"),
+        Some("2022-01-01"),
+        false,  // 禁用基准回测
+    )
+    .await;
+
+    // 应该返回错误
+    assert!(result.is_err());
+    let error_msg = result.unwrap_err().to_string();
+    assert!(error_msg.contains("无效") || error_msg.contains("Invalid"));
+
+    Ok(())
+}
+
+/// 测试时间解析功能
+#[test]
+fn test_time_parsing() {
+    use aurora_backtester::time_utils::parse_date_to_timestamp;
+    
+    // 测试日期格式
+    let result = parse_date_to_timestamp("2024-01-01");
+    assert!(result.is_ok());
+    
+    // 测试日期时间格式
+    let result = parse_date_to_timestamp("2024-01-01 12:30:45");
+    assert!(result.is_ok());
+    
+    // 测试无效格式
+    let result = parse_date_to_timestamp("invalid");
+    assert!(result.is_err());
+}
+

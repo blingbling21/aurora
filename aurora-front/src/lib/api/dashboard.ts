@@ -12,9 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! API模块
+/**
+ * 仪表盘 API 服务
+ */
 
-pub mod backtest;
-pub mod config;
-pub mod data;
-pub mod dashboard;
+import { get } from './client';
+import type { ApiResponse, DashboardData } from '@/types/api';
+
+/**
+ * 仪表盘服务类
+ */
+export class DashboardService {
+  /**
+   * 获取仪表盘数据（统计信息和最近任务）
+   * 
+   * @returns 仪表盘数据，包含任务统计和最近任务列表
+   */
+  static async getData(): Promise<ApiResponse<DashboardData>> {
+    return get<DashboardData>('/dashboard');
+  }
+}

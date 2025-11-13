@@ -453,4 +453,117 @@ mod tests {
             assert_eq!(config.logging.format, format);
         }
     }
+
+    #[test]
+    fn test_load_config_with_benchmark_enabled() {
+        let config_content = r#"
+            [data_source]
+            provider = "binance"
+
+            [[strategies]]
+            name = "Test Strategy"
+            strategy_type = "ma-crossover"
+            enabled = true
+
+            [strategies.parameters]
+            short = 10
+            long = 30
+
+            [portfolio]
+            initial_cash = 10000.0
+
+            [logging]
+            level = "info"
+
+            [backtest]
+            data_path = "test.csv"
+            symbol = "BTCUSDT"
+
+            [backtest.benchmark]
+            enabled = true
+            data_path = "benchmark.csv"
+        "#;
+
+        let config = Config::from_str(config_content).unwrap();
+        assert!(config.backtest.is_some());
+        
+        let backtest = config.backtest.unwrap();
+        assert!(backtest.benchmark.is_some());
+        
+        let benchmark = backtest.benchmark.unwrap();
+        assert_eq!(benchmark.enabled, true);
+        assert_eq!(benchmark.data_path, Some("benchmark.csv".to_string()));
+        assert!(benchmark.validate().is_ok());
+    }
+
+    #[test]
+    fn test_load_config_with_benchmark_disabled() {
+        let config_content = r#"
+            [data_source]
+            provider = "binance"
+
+            [[strategies]]
+            name = "Test Strategy"
+            strategy_type = "ma-crossover"
+            enabled = true
+
+            [strategies.parameters]
+            short = 10
+            long = 30
+
+            [portfolio]
+            initial_cash = 10000.0
+
+            [logging]
+            level = "info"
+
+            [backtest]
+            data_path = "test.csv"
+
+            [backtest.benchmark]
+            enabled = false
+        "#;
+
+        let config = Config::from_str(config_content).unwrap();
+        assert!(config.backtest.is_some());
+        
+        let backtest = config.backtest.unwrap();
+        assert!(backtest.benchmark.is_some());
+        
+        let benchmark = backtest.benchmark.unwrap();
+        assert_eq!(benchmark.enabled, false);
+        assert!(benchmark.validate().is_ok());
+    }
+
+    #[test]
+    fn test_load_config_without_benchmark() {
+        let config_content = r#"
+            [data_source]
+            provider = "binance"
+
+            [[strategies]]
+            name = "Test Strategy"
+            strategy_type = "ma-crossover"
+            enabled = true
+
+            [strategies.parameters]
+            short = 10
+            long = 30
+
+            [portfolio]
+            initial_cash = 10000.0
+
+            [logging]
+            level = "info"
+
+            [backtest]
+            data_path = "test.csv"
+        "#;
+
+        let config = Config::from_str(config_content).unwrap();
+        assert!(config.backtest.is_some());
+        
+        let backtest = config.backtest.unwrap();
+        assert!(backtest.benchmark.is_none());
+    }
 }

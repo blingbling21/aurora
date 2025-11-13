@@ -28,7 +28,9 @@ import type {
   BacktestSettings,
   LiveConfig,
   PricingMode,
+  BenchmarkConfig,
 } from '@/types/config-schema';
+import { dataApi } from '@/lib/api';
 
 // ==================== 数据源配置区块 ====================
 
@@ -951,11 +953,45 @@ interface BacktestSectionProps {
 }
 
 export function BacktestSection({ config, onChange }: BacktestSectionProps) {
+  // 存储已下载的数据文件列表
+  const [dataFiles, setDataFiles] = React.useState<string[]>([]);
+
+  // 加载数据文件列表
+  React.useEffect(() => {
+    const loadDataFiles = async () => {
+      try {
+        const response = await dataApi.list();
+        if (response.success && response.data) {
+          const filenames = response.data.map(file => file.filename);
+          setDataFiles(filenames);
+        }
+      } catch (error) {
+        console.error('加载数据文件列表失败:', error);
+      }
+    };
+    loadDataFiles();
+  }, []);
+
   const updateField = <K extends keyof NonNullable<BacktestSettings>>(
     key: K,
     value: NonNullable<BacktestSettings>[K]
   ) => {
     onChange({ ...config, [key]: value } as BacktestSettings);
+  };
+
+  const updateBenchmarkField = <K extends keyof BenchmarkConfig>(
+    key: K,
+    value: BenchmarkConfig[K]
+  ) => {
+    const currentBenchmark = config?.benchmark || { enabled: false };
+    const updatedBenchmark = { ...currentBenchmark, [key]: value };
+    
+    // 如果禁用基准，则将整个 benchmark 设置为 undefined
+    if (key === 'enabled' && value === false) {
+      updateField('benchmark', undefined);
+    } else {
+      updateField('benchmark', updatedBenchmark);
+    }
   };
 
   return (
@@ -1108,6 +1144,61 @@ export function BacktestSection({ config, onChange }: BacktestSectionProps) {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* 基准配置 */}
+          <div className="col-span-full">
+            <h5 className="text-sm font-semibold text-gray-800 mb-3 mt-2 flex items-center justify-between">
+              <span>基准配置</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">
+                  {config.benchmark?.enabled ? '已启用' : '已禁用'}
+                </span>
+                <Switch
+                  checked={config.benchmark?.enabled || false}
+                  onCheckedChange={(checked) => {
+                    updateBenchmarkField('enabled', checked);
+                    if (!checked) {
+                      // 禁用时清除数据路径
+                      updateBenchmarkField('data_path', undefined);
+                    }
+                  }}
+                />
+              </div>
+            </h5>
+            {config.benchmark?.enabled && (
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    基准数据文件 *:
+                  </label>
+                  <Select
+                    value={config.benchmark.data_path || ''}
+                    onValueChange={(value) => updateBenchmarkField('data_path', value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="选择基准数据文件" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dataFiles.length > 0 ? (
+                        dataFiles.map((filename) => (
+                          <SelectItem key={filename} value={filename}>
+                            {filename}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>
+                          暂无可用数据文件
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    选择用于基准对比的数据文件
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

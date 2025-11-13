@@ -237,7 +237,7 @@ async fn execute_backtest(
     data_path: String,
     state: AppState,
 ) -> Result<(), anyhow::Error> {
-    use aurora_backtester::run_backtest;
+    use aurora_backtester::run_backtest_with_progress;
     use aurora_config::Config;
 
     info!("开始执行回测任务: {}", task_id);
@@ -254,6 +254,14 @@ async fn execute_backtest(
         return Err(anyhow::anyhow!("数据文件不存在: {:?}", data_full_path));
     }
 
+    // 更新进度: 5% - 开始加载配置
+    {
+        let mut tasks = state.backtest_tasks.write().await;
+        if let Some(task) = tasks.get_mut(&task_id) {
+            task.update_progress(5);
+        }
+    }
+
     // 加载配置
     let full_config = Config::from_file(config_full_path.to_str().unwrap())?;
     
@@ -261,7 +269,28 @@ async fn execute_backtest(
     let config = full_config.backtest.as_ref()
         .ok_or_else(|| anyhow::anyhow!("配置文件中缺少回测配置"))?;
     
-    // 更新进度: 10%
+    // 检查是否启用基准配置
+    let enable_benchmark = if let Some(benchmark) = &config.benchmark {
+        if benchmark.enabled {
+            if let Some(benchmark_path) = &benchmark.data_path {
+                info!("基准配置已启用，基准数据文件: {}", benchmark_path);
+                // TODO: 实现基准回测逻辑
+                // 当前版本仅记录基准配置，实际的基准回测功能需要在回测引擎中实现
+                true
+            } else {
+                tracing::warn!("基准配置已启用但未指定数据文件路径");
+                false
+            }
+        } else {
+            info!("基准配置已禁用");
+            false
+        }
+    } else {
+        info!("未配置基准");
+        false
+    };
+    
+    // 更新进度: 10% - 配置加载完成
     {
         let mut tasks = state.backtest_tasks.write().await;
         if let Some(task) = tasks.get_mut(&task_id) {
@@ -272,14 +301,6 @@ async fn execute_backtest(
     // 执行回测
     info!("配置已加载，开始运行回测引擎");
     
-    // 更新进度: 30%
-    {
-        let mut tasks = state.backtest_tasks.write().await;
-        if let Some(task) = tasks.get_mut(&task_id) {
-            task.update_progress(30);
-        }
-    }
-
     // 从策略列表中提取第一个策略参数（如果存在）
     let (short_period, long_period) = if !full_config.strategies.is_empty() {
         let strategy = &full_config.strategies[0];
@@ -302,31 +323,53 @@ async fn execute_backtest(
         (5, 20) // 默认值
     };
 
-    // 更新进度: 50%
+    // 更新进度: 15% - 参数提取完成,准备运行回测
     {
         let mut tasks = state.backtest_tasks.write().await;
         if let Some(task) = tasks.get_mut(&task_id) {
-            task.update_progress(50);
+            task.update_progress(15);
         }
     }
 
-    // 运行回测并获取结果
+    // 创建进度回调函数,将回测引擎的进度(0-100)映射到任务进度(15-95)
+    let state_for_callback = state.clone();
+    let progress_callback = move |engine_progress: u8| {
+        // 将引擎进度(0-100)映射到任务进度(15-95)
+        // 因为15%之前是配置加载,95%之后是结果生成
+        let task_progress = 15 + ((engine_progress as f64 / 100.0) * 80.0) as u8;
+        let task_progress = task_progress.min(95);
+        
+        // 异步更新任务进度
+        let state_clone = state_for_callback.clone();
+        tokio::spawn(async move {
+            let mut tasks = state_clone.backtest_tasks.write().await;
+            if let Some(task) = tasks.get_mut(&task_id) {
+                task.update_progress(task_progress);
+            }
+        });
+    };
+    
+    // 运行回测并获取结果,传入进度回调
     info!("开始运行回测引擎...");
-    let backtest_result = run_backtest(
+    let backtest_result = run_backtest_with_progress(
         data_full_path.to_str().unwrap(),
         "ma-crossover",
         short_period,
         long_period,
         &full_config.portfolio,
         config.pricing_mode.as_ref(),
+        Some(progress_callback),
+        config.start_time.as_deref(),
+        config.end_time.as_deref(),
+        enable_benchmark, // 传递基准启用标志
     )
     .await?;
 
-    // 更新进度: 90%
+    // 更新进度: 95% - 回测完成,准备生成结果
     {
         let mut tasks = state.backtest_tasks.write().await;
         if let Some(task) = tasks.get_mut(&task_id) {
-            task.update_progress(90);
+            task.update_progress(95);
         }
     }
 
