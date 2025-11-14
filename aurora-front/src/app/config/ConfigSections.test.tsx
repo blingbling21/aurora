@@ -369,7 +369,10 @@ describe('BacktestSection', () => {
     const switchElement = screen.getByRole('switch');
     fireEvent.click(switchElement);
 
-    expect(mockOnChange).toHaveBeenCalledWith({ data_path: '' });
+    expect(mockOnChange).toHaveBeenCalledWith({ 
+      data_path: '',
+      timezone: expect.any(String) // 默认时区会被自动设置
+    });
   });
 
   // 测试定价模式选择为收盘价模式

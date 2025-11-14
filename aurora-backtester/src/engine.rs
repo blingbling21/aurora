@@ -23,7 +23,7 @@ use tracing::{debug, error, info};
 // 在库内部使用相对路径
 use crate::pricing_mode::PricingMode;
 use crate::result::BacktestResult;
-use crate::time_utils::{parse_date_to_timestamp, validate_time_range, format_timestamp, TimeRangeValidation};
+use crate::time_utils::{parse_date_to_timestamp_with_tz, validate_time_range, format_timestamp_with_tz, TimeRangeValidation};
 
 /// 运行回测
 pub async fn run_backtest(
@@ -44,6 +44,7 @@ pub async fn run_backtest(
         None,
         None,
         None,
+        None, // 默认时区为None（UTC）
         false, // 默认禁用基准回测
     )
     .await
@@ -60,6 +61,7 @@ pub async fn run_backtest_with_progress<F>(
     progress_callback: Option<F>,
     start_time: Option<&str>,
     end_time: Option<&str>,
+    timezone: Option<&str>,
     enable_benchmark: bool,
 ) -> Result<BacktestResult>
 where
@@ -72,27 +74,27 @@ where
 
     info!("加载数据文件: {}", data_path);
     
-    // 解析时间范围
+    // 解析时间范围（使用指定的时区）
     let start_timestamp = if let Some(start_str) = start_time {
-        Some(parse_date_to_timestamp(start_str)?)
+        Some(parse_date_to_timestamp_with_tz(start_str, timezone)?)
     } else {
         None
     };
     
     let end_timestamp = if let Some(end_str) = end_time {
-        Some(parse_date_to_timestamp(end_str)?)
+        Some(parse_date_to_timestamp_with_tz(end_str, timezone)?)
     } else {
         None
     };
     
     // 加载并过滤数据
-    let klines = load_klines_from_csv_with_filter(data_path, start_timestamp, end_timestamp)?;
+    let klines = load_klines_from_csv_with_filter(data_path, start_timestamp, end_timestamp, timezone)?;
     
     if let (Some(start), Some(end)) = (start_timestamp, end_timestamp) {
         info!(
             "应用时间过滤: {} 到 {}, 过滤后数据: {} 条",
-            format_timestamp(start),
-            format_timestamp(end),
+            format_timestamp_with_tz(start, timezone),
+            format_timestamp_with_tz(end, timezone),
             klines.len()
         );
     }
@@ -128,7 +130,7 @@ where
 
 /// 从CSV文件加载K线数据
 fn load_klines_from_csv(file_path: &str) -> Result<Vec<Kline>> {
-    load_klines_from_csv_with_filter(file_path, None, None)
+    load_klines_from_csv_with_filter(file_path, None, None, None)
 }
 
 /// 从CSV文件加载K线数据（支持时间范围过滤）
@@ -138,6 +140,7 @@ fn load_klines_from_csv(file_path: &str) -> Result<Vec<Kline>> {
 /// * `file_path` - CSV文件路径
 /// * `start_time` - 开始时间戳（毫秒，可选）
 /// * `end_time` - 结束时间戳（毫秒，可选）
+/// * `timezone` - 时区字符串（可选，用于日志输出）
 ///
 /// # 返回值
 ///
@@ -146,6 +149,7 @@ fn load_klines_from_csv_with_filter(
     file_path: &str,
     start_time: Option<i64>,
     end_time: Option<i64>,
+    timezone: Option<&str>,
 ) -> Result<Vec<Kline>> {
     let mut reader = csv::Reader::from_path(file_path)?;
     let mut klines = Vec::new();
@@ -185,31 +189,31 @@ fn load_klines_from_csv_with_filter(
                     "配置的时间范围与数据完全不重叠！\n\
                      配置范围: {} 到 {}\n\
                      数据范围: {} 到 {}",
-                    format_timestamp(config_start),
-                    format_timestamp(config_end),
-                    format_timestamp(data_start),
-                    format_timestamp(data_end)
+                    format_timestamp_with_tz(config_start, timezone),
+                    format_timestamp_with_tz(config_end, timezone),
+                    format_timestamp_with_tz(data_start, timezone),
+                    format_timestamp_with_tz(data_end, timezone)
                 ));
             }
             TimeRangeValidation::StartBeforeData { config_start, data_start } => {
                 info!(
                     "警告: 配置的开始时间 {} 早于数据开始时间 {}，将使用数据开始时间",
-                    format_timestamp(config_start),
-                    format_timestamp(data_start)
+                    format_timestamp_with_tz(config_start, timezone),
+                    format_timestamp_with_tz(data_start, timezone)
                 );
             }
             TimeRangeValidation::EndAfterData { config_end, data_end } => {
                 info!(
                     "警告: 配置的结束时间 {} 晚于数据结束时间 {}，将使用数据结束时间",
-                    format_timestamp(config_end),
-                    format_timestamp(data_end)
+                    format_timestamp_with_tz(config_end, timezone),
+                    format_timestamp_with_tz(data_end, timezone)
                 );
             }
             TimeRangeValidation::InvalidRange { start, end } => {
                 return Err(anyhow!(
                     "无效的时间范围: 开始时间 {} 晚于结束时间 {}",
-                    format_timestamp(start),
-                    format_timestamp(end)
+                    format_timestamp_with_tz(start, timezone),
+                    format_timestamp_with_tz(end, timezone)
                 ));
             }
         }
@@ -224,8 +228,8 @@ fn load_klines_from_csv_with_filter(
         
         info!(
             "时间范围过滤: {} 到 {}, 保留 {} 条数据",
-            format_timestamp(filter_start.max(data_start)),
-            format_timestamp(filter_end.min(data_end)),
+            format_timestamp_with_tz(filter_start.max(data_start), timezone),
+            format_timestamp_with_tz(filter_end.min(data_end), timezone),
             klines.len()
         );
     }

@@ -361,6 +361,7 @@ async fn execute_backtest(
         Some(progress_callback),
         config.start_time.as_deref(),
         config.end_time.as_deref(),
+        config.timezone.as_deref(), // 传递时区配置
         enable_benchmark, // 传递基准启用标志
     )
     .await?;

@@ -19,7 +19,7 @@
  */
 
 import React from 'react';
-import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from '@/components/ui';
+import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, DatePicker } from '@/components/ui';
 import type {
   DataSourceConfig,
   StrategyConfig,
@@ -31,6 +31,7 @@ import type {
   BenchmarkConfig,
 } from '@/types/config-schema';
 import { dataApi } from '@/lib/api';
+import { TIMEZONE_OPTIONS, getCurrentTimezone } from '@/constants';
 
 // ==================== 数据源配置区块 ====================
 
@@ -1006,8 +1007,11 @@ export function BacktestSection({ config, onChange }: BacktestSectionProps) {
             checked={config !== undefined}
             onCheckedChange={(checked) => {
               if (checked) {
-                // 启用回测配置,设置默认值
-                onChange({ data_path: '' });
+                // 启用回测配置,设置默认值（包括默认时区）
+                onChange({ 
+                  data_path: '',
+                  timezone: getCurrentTimezone(),
+                });
               } else {
                 // 禁用回测配置
                 onChange(undefined);
@@ -1058,11 +1062,24 @@ export function BacktestSection({ config, onChange }: BacktestSectionProps) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               开始时间:
             </label>
-            <Input
-              type="text"
-              value={config.start_time || ''}
-              onChange={(e) => updateField('start_time', e.target.value || undefined)}
-              placeholder="2024-01-01"
+            <DatePicker
+              date={config.start_time ? (() => {
+                const d = new Date(config.start_time);
+                return isNaN(d.getTime()) ? undefined : d;
+              })() : undefined}
+              onDateChange={(date) => {
+                if (date) {
+                  // 使用本地时间格式化为 YYYY-MM-DD
+                  const year = date.getFullYear();
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  const formatted = `${year}-${month}-${day}`;
+                  updateField('start_time', formatted);
+                } else {
+                  updateField('start_time', undefined);
+                }
+              }}
+              placeholder="选择开始日期"
               className="w-full"
             />
           </div>
@@ -1070,13 +1087,49 @@ export function BacktestSection({ config, onChange }: BacktestSectionProps) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               结束时间:
             </label>
-            <Input
-              type="text"
-              value={config.end_time || ''}
-              onChange={(e) => updateField('end_time', e.target.value || undefined)}
-              placeholder="2024-12-31"
+            <DatePicker
+              date={config.end_time ? (() => {
+                const d = new Date(config.end_time);
+                return isNaN(d.getTime()) ? undefined : d;
+              })() : undefined}
+              onDateChange={(date) => {
+                if (date) {
+                  // 使用本地时间格式化为 YYYY-MM-DD
+                  const year = date.getFullYear();
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  const formatted = `${year}-${month}-${day}`;
+                  updateField('end_time', formatted);
+                } else {
+                  updateField('end_time', undefined);
+                }
+              }}
+              placeholder="选择结束日期"
               className="w-full"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              时区:
+            </label>
+            <Select
+              value={config.timezone || getCurrentTimezone()}
+              onValueChange={(value) => updateField('timezone', value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="选择时区" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIMEZONE_OPTIONS.map((tz) => (
+                  <SelectItem key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500 mt-1">
+              开始时间和结束时间所在的时区
+            </p>
           </div>
 
           {/* 定价模式配置 */}
@@ -1158,10 +1211,6 @@ export function BacktestSection({ config, onChange }: BacktestSectionProps) {
                   checked={config.benchmark?.enabled || false}
                   onCheckedChange={(checked) => {
                     updateBenchmarkField('enabled', checked);
-                    if (!checked) {
-                      // 禁用时清除数据路径
-                      updateBenchmarkField('data_path', undefined);
-                    }
                   }}
                 />
               </div>
@@ -1187,7 +1236,7 @@ export function BacktestSection({ config, onChange }: BacktestSectionProps) {
                           </SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="no-data-files" disabled>
                           暂无可用数据文件
                         </SelectItem>
                       )}

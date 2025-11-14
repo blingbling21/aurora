@@ -120,12 +120,14 @@ mod tests {
             interval: Some("1h".to_string()),
             start_time: Some("2024-01-01".to_string()),
             end_time: Some("2024-12-31".to_string()),
+            timezone: Some("Asia/Shanghai".to_string()),
             pricing_mode: None,
             benchmark: None,
         };
 
         assert_eq!(config.data_path, "data.csv");
         assert_eq!(config.symbol, Some("BTCUSDT".to_string()));
+        assert_eq!(config.timezone, Some("Asia/Shanghai".to_string()));
     }
 
     #[test]

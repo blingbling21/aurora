@@ -49,10 +49,15 @@ export function DataList({ onSelect, refreshTrigger }: DataListProps) {
   /**
    * 加载数据文件列表
    */
-  const loadDataFiles = async () => {
+  const loadDataFiles = async (signal?: AbortSignal) => {
     setLoading(true);
     try {
       const response = await dataApi.list();
+      
+      // 如果请求被取消，不更新状态
+      if (signal?.aborted) {
+        return;
+      }
       
       if (response.success && response.data) {
         setDataFiles(response.data);
@@ -60,13 +65,20 @@ export function DataList({ onSelect, refreshTrigger }: DataListProps) {
         throw new Error(response.error || '获取数据文件列表失败');
       }
     } catch (error) {
+      // 如果请求被取消，不显示错误
+      if (signal?.aborted) {
+        return;
+      }
+      
       addNotification({
         type: 'error',
         message: error instanceof Error ? error.message : '获取数据文件列表失败',
       });
       setDataFiles([]);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   };
 
@@ -132,7 +144,16 @@ export function DataList({ onSelect, refreshTrigger }: DataListProps) {
 
   // 初始加载和响应刷新触发器
   useEffect(() => {
-    loadDataFiles();
+    // 创建 AbortController 用于取消请求
+    const abortController = new AbortController();
+    
+    // 执行加载
+    loadDataFiles(abortController.signal);
+    
+    // 清理函数：组件卸载或依赖变化时取消请求
+    return () => {
+      abortController.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTrigger]);
 
@@ -142,7 +163,7 @@ export function DataList({ onSelect, refreshTrigger }: DataListProps) {
       <div className="flex justify-end mb-4">
         <Button 
           variant="secondary" 
-          onClick={loadDataFiles}
+          onClick={() => loadDataFiles()}
           disabled={loading}
         >
           {loading ? '加载中...' : '🔄 刷新'}

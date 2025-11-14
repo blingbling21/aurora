@@ -64,7 +64,7 @@ export default function BacktestPage() {
     onConnected: () => {
       // WebSocket已连接
     },
-    onStatusUpdate: (progressValue, status) => {
+    onStatusUpdate: (progressValue, status, errorMessage) => {
       // 更新进度条
       setProgress(progressValue);
       setProgressMessage(`状态: ${status}`);
@@ -80,10 +80,15 @@ export default function BacktestPage() {
             message: '回测任务完成',
           });
         } else {
+          // 显示详细的错误信息
+          const errorMsg = errorMessage || '回测任务失败';
           addNotification({
             type: 'error',
-            message: '回测任务失败',
+            message: errorMsg,
+            duration: 10000, // 错误信息显示更长时间
           });
+          // 同时更新进度消息
+          setProgressMessage(`失败: ${errorMsg}`);
         }
       }
     },
@@ -421,7 +426,11 @@ export default function BacktestPage() {
 
             <div className="h-6 bg-gray-200 rounded-full overflow-hidden">
               <div
-                className="h-full bg-linear-to-r from-blue-500 to-blue-600 transition-all duration-300 flex items-center justify-center"
+                className={`h-full transition-all duration-300 flex items-center justify-center ${
+                  progressMessage.startsWith('失败') 
+                    ? 'bg-linear-to-r from-red-500 to-red-600' 
+                    : 'bg-linear-to-r from-blue-500 to-blue-600'
+                }`}
                 style={{ width: `${progress}%` }}
               >
                 {progress > 10 && (
@@ -432,9 +441,13 @@ export default function BacktestPage() {
               </div>
             </div>
 
-            <p className="text-sm text-gray-600">
+            <div className={`text-sm ${
+              progressMessage.startsWith('失败') 
+                ? 'text-red-600 font-medium' 
+                : 'text-gray-600'
+            }`}>
               {progressMessage || '准备中...'}
-            </p>
+            </div>
 
             <Button
               variant="secondary"

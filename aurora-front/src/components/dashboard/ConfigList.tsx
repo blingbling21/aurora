@@ -49,10 +49,15 @@ export function ConfigList({ onSelect, refreshTrigger }: ConfigListProps) {
   /**
    * 加载配置列表
    */
-  const loadConfigs = async () => {
+  const loadConfigs = async (signal?: AbortSignal) => {
     setLoading(true);
     try {
       const response = await configApi.list();
+      
+      // 如果请求被取消，不更新状态
+      if (signal?.aborted) {
+        return;
+      }
       
       if (response.success && response.data) {
         setConfigs(response.data);
@@ -60,13 +65,20 @@ export function ConfigList({ onSelect, refreshTrigger }: ConfigListProps) {
         throw new Error(response.error || '获取配置列表失败');
       }
     } catch (error) {
+      // 如果请求被取消，不显示错误
+      if (signal?.aborted) {
+        return;
+      }
+      
       addNotification({
         type: 'error',
         message: error instanceof Error ? error.message : '获取配置列表失败',
       });
       setConfigs([]);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   };
 
@@ -119,7 +131,16 @@ export function ConfigList({ onSelect, refreshTrigger }: ConfigListProps) {
 
   // 初始加载和响应刷新触发器
   useEffect(() => {
-    loadConfigs();
+    // 创建 AbortController 用于取消请求
+    const abortController = new AbortController();
+    
+    // 执行加载
+    loadConfigs(abortController.signal);
+    
+    // 清理函数：组件卸载或依赖变化时取消请求
+    return () => {
+      abortController.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTrigger]);
 
@@ -129,7 +150,7 @@ export function ConfigList({ onSelect, refreshTrigger }: ConfigListProps) {
       <div className="flex justify-end mb-4">
         <Button 
           variant="secondary" 
-          onClick={loadConfigs}
+          onClick={() => loadConfigs()}
           disabled={loading}
         >
           {loading ? '加载中...' : '🔄 刷新'}

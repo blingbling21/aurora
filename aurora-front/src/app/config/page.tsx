@@ -37,6 +37,7 @@ import {
 import { readTOMLFile, stringifyTOML, validateTOML } from '@/lib/utils/toml';
 import { useNotificationStore } from '@/lib/store';
 import { configApi } from '@/lib/api';
+import { getCurrentTimezone } from '@/constants';
 import {
   DataSourceSection,
   StrategiesSection,
@@ -177,7 +178,15 @@ export default function ConfigPage() {
       
       // 如果在表单模式,先转换为TOML文本
       if (editMode === 'form') {
-        contentToSave = await stringifyTOML(config);
+        // 确保回测配置中有时区字段的默认值
+        const configToSave = { ...config };
+        if (configToSave.backtest && !configToSave.backtest.timezone) {
+          configToSave.backtest = {
+            ...configToSave.backtest,
+            timezone: getCurrentTimezone(),
+          };
+        }
+        contentToSave = await stringifyTOML(configToSave);
       }
 
       // 先检查配置是否已存在

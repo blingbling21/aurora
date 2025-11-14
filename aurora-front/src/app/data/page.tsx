@@ -32,6 +32,7 @@ import {
 import { EXCHANGE_OPTIONS, INTERVAL_OPTIONS, SYMBOL_OPTIONS } from '@/constants';
 import { DataList } from '@/components/dashboard/DataList';
 import { generateDataFilename } from '@/lib/utils/filename';
+import { formatDateToUTC } from '@/lib/utils/format';
 import { dataApi } from '@/lib/api';
 import { useDataDownloadStore } from '@/lib/store/dataDownloadStore';
 import { useDataDownloadWebSocket } from '@/lib/hooks/useDataDownloadWebSocket';
@@ -207,8 +208,8 @@ export default function DataPage() {
         exchange,
         symbol: symbol.toUpperCase(),
         interval,
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
+        start_date: formatDateToUTC(startDate),
+        end_date: formatDateToUTC(endDate),
         filename: filename || undefined,
       };
 

@@ -320,7 +320,47 @@ describe('useBacktestWebSocket', () => {
       });
 
       // 验证回调被调用
-      expect(onStatusUpdate).toHaveBeenCalledWith(50, 'running');
+      expect(onStatusUpdate).toHaveBeenCalledWith(50, 'running', undefined);
+    });
+
+    it('应该在 status_update 消息中传递错误信息', async () => {
+      // 准备回调函数
+      const onStatusUpdate = jest.fn();
+
+      // 渲染 hook
+      renderHook(() =>
+        useBacktestWebSocket('test-task', {
+          autoConnect: true,
+          onStatusUpdate,
+        })
+      );
+
+      // 等待连接
+      act(() => {
+        jest.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(mockWebSocket?.readyState).toBe(MockWebSocket.OPEN);
+      });
+
+      // 模拟接收带错误信息的 status_update 消息
+      act(() => {
+        const message: WsMessage = {
+          type: 'status_update',
+          progress: 100,
+          status: 'failed' as TaskStatus,
+          error: '配置的时间范围与数据完全不重叠！\n配置范围: 2024-01-01 00:00:00 到 2024-12-31 00:00:00\n数据范围: 2024-12-31 08:00:00 到 2025-11-13 08:00:00',
+        };
+        mockWebSocket?.simulateMessage(message);
+      });
+
+      // 验证回调被调用，并包含错误信息
+      expect(onStatusUpdate).toHaveBeenCalledWith(
+        100, 
+        'failed',
+        '配置的时间范围与数据完全不重叠！\n配置范围: 2024-01-01 00:00:00 到 2024-12-31 00:00:00\n数据范围: 2024-12-31 08:00:00 到 2025-11-13 08:00:00'
+      );
     });
 
     it('应该接收并处理 final 消息', async () => {
@@ -763,8 +803,8 @@ describe('useBacktestWebSocket', () => {
         mockWebSocket?.simulateMessage(statusMessage);
       });
 
-      // 验证状态更新回调被调用
-      expect(onStatusUpdate).toHaveBeenCalledWith(100, 'completed');
+      // 验证状态更新回调被调用（现在包含第三个参数undefined）
+      expect(onStatusUpdate).toHaveBeenCalledWith(100, 'completed', undefined);
 
       // 模拟接收 final 消息
       act(() => {

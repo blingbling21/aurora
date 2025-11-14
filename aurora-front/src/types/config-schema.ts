@@ -265,6 +265,8 @@ export const BacktestSettingsSchema = z.object({
   start_time: z.string().optional(),
   // 回测结束时间(可选)
   end_time: z.string().optional(),
+  // 时区(可选，默认 UTC)，应用于 start_time 和 end_time
+  timezone: z.string().optional(),
   // 定价模式配置(可选)
   pricing_mode: PricingModeSchema,
   // 基准配置(可选)

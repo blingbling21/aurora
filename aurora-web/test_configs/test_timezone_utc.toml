@@ -1,0 +1,17 @@
+# 测试配置 - 使用UTC时区
+[strategy]
+name = "ma-crossover"
+short_period = 10
+long_period = 20
+
+[portfolio]
+initial_cash = 10000.0
+
+[backtest]
+data_path = "./data/binance_btcusdt_1m_20250101_to_20251114.csv"
+symbol = "BTCUSDT"
+interval = "1m"
+# 使用UTC时区，2024-12-31 00:00:00就是CSV文件的第一行（timestamp 1735603200000）
+start_time = "2024-12-31 00:00:00"
+end_time = "2024-12-31 01:00:00"
+timezone = "UTC"

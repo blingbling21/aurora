@@ -19,6 +19,8 @@
 import {
   formatFileSize,
   formatDate,
+  formatDateToLocal,
+  formatDateToUTC,
   formatPercent,
   formatCurrency,
   getTaskStatusText,
@@ -60,6 +62,80 @@ describe('Format Utils', () => {
       expect(result).toContain('2024');
       expect(result).toContain('01');
       expect(result).toContain('15');
+    });
+  });
+
+  describe('formatDateToLocal', () => {
+    it('应该将 Date 对象转换为本地时间的日期字符串（YYYY-MM-DD）', () => {
+      const date = new Date(2025, 0, 1); // 2025-01-01 本地时间
+      const result = formatDateToLocal(date);
+      expect(result).toBe('2025-01-01');
+    });
+
+    it('应该正确处理单数字的月份和日期（补零）', () => {
+      const date = new Date(2025, 0, 5); // 2025-01-05
+      const result = formatDateToLocal(date);
+      expect(result).toBe('2025-01-05');
+    });
+
+    it('应该使用本地时间方法进行格式化', () => {
+      const date = new Date(2025, 11, 31); // 2025-12-31
+      const result = formatDateToLocal(date);
+      expect(result).toBe('2025-12-31');
+    });
+
+    it('应该处理年初和年末的日期', () => {
+      const date1 = new Date(2025, 0, 1); // 年初
+      expect(formatDateToLocal(date1)).toBe('2025-01-01');
+      
+      const date2 = new Date(2025, 11, 31); // 年末
+      expect(formatDateToLocal(date2)).toBe('2025-12-31');
+    });
+  });
+
+  describe('formatDateToUTC', () => {
+    it('应该将本地时间的 Date 对象转换为 UTC 时间的日期字符串（YYYY-MM-DD）', () => {
+      // 创建一个本地时间的 Date 对象
+      // 假设我们在 UTC+8 时区
+      const date = new Date(2025, 0, 1, 0, 0, 0); // 2025-01-01 00:00:00 本地时间
+      const result = formatDateToUTC(date);
+      
+      // UTC 时间应该是前一天（减去8小时）
+      // 2025-01-01 00:00:00 UTC+8 = 2024-12-31 16:00:00 UTC
+      expect(result).toBe('2024-12-31');
+    });
+
+    it('应该正确处理不同时区的转换', () => {
+      // 本地时间正午，转换为 UTC 不会跨天（对于 UTC+8 以内的时区）
+      const date1 = new Date(2025, 0, 1, 12, 0, 0); // 2025-01-01 12:00:00 本地时间
+      // 2025-01-01 12:00:00 UTC+8 = 2025-01-01 04:00:00 UTC
+      expect(formatDateToUTC(date1)).toBe('2025-01-01');
+      
+      // 凌晨时间会跨天
+      const date2 = new Date(2025, 0, 1, 0, 0, 0); // 2025-01-01 00:00:00 本地时间
+      expect(formatDateToUTC(date2)).toBe('2024-12-31');
+    });
+
+    it('应该正确处理单数字的月份和日期（补零）', () => {
+      const date = new Date(2025, 0, 1, 12, 0, 0); // 2025-01-01 12:00:00 本地时间
+      const result = formatDateToUTC(date);
+      
+      // 验证月份和日期都有补零
+      expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('应该使用 UTC 时间方法进行转换', () => {
+      // 这个测试确保我们使用的是 UTC 时间方法
+      const date = new Date(2025, 0, 1, 0, 0, 0); // 本地时间
+      const result = formatDateToUTC(date);
+      
+      // 使用 getUTC* 方法应该得到 UTC 时间
+      const expectedYear = date.getUTCFullYear();
+      const expectedMonth = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const expectedDay = String(date.getUTCDate()).padStart(2, '0');
+      const expected = `${expectedYear}-${expectedMonth}-${expectedDay}`;
+      
+      expect(result).toBe(expected);
     });
   });
 

@@ -443,6 +443,7 @@ async fn test_time_range_filtering() -> Result<()> {
         None,
         Some("2022-01-01"),
         Some("2022-01-02"),
+        None,   // 默认使用UTC时区
         false,  // 禁用基准回测
     )
     .await;
@@ -474,6 +475,7 @@ async fn test_time_range_no_overlap() -> Result<()> {
         None,
         Some("2023-01-01"),
         Some("2023-12-31"),
+        None,   // 默认使用UTC时区
         false,  // 禁用基准回测
     )
     .await;
@@ -505,6 +507,7 @@ async fn test_invalid_time_range() -> Result<()> {
         None,
         Some("2022-12-31"),
         Some("2022-01-01"),
+        None,   // 默认使用UTC时区
         false,  // 禁用基准回测
     )
     .await;

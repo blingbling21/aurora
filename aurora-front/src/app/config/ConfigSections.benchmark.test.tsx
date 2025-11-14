@@ -57,11 +57,17 @@ describe('BacktestSection - Benchmark Configuration', () => {
       expect(dataApi.list).toHaveBeenCalled();
     });
 
-    // 找到基准配置开关
+    // 等待基准配置文本出现
+    await waitFor(() => {
+      expect(screen.getByText('基准配置')).toBeInTheDocument();
+    });
+
+    // 找到基准配置开关 - 使用更精确的查找方式
     const switches = screen.getAllByRole('switch');
-    const benchmarkSwitch = switches.find(s => 
-      s.closest('div')?.textContent?.includes('基准配置')
-    );
+    const benchmarkSwitch = switches.find(s => {
+      const parent = s.closest('h5');
+      return parent?.textContent?.includes('基准配置');
+    });
 
     expect(benchmarkSwitch).toBeDefined();
 
@@ -95,11 +101,17 @@ describe('BacktestSection - Benchmark Configuration', () => {
       expect(dataApi.list).toHaveBeenCalled();
     });
 
-    // 找到基准配置开关
+    // 等待基准配置文本出现
+    await waitFor(() => {
+      expect(screen.getByText('基准配置')).toBeInTheDocument();
+    });
+
+    // 找到基准配置开关 - 使用更精确的查找方式
     const switches = screen.getAllByRole('switch');
-    const benchmarkSwitch = switches.find(s => 
-      s.closest('div')?.textContent?.includes('基准配置')
-    );
+    const benchmarkSwitch = switches.find(s => {
+      const parent = s.closest('h5');
+      return parent?.textContent?.includes('基准配置');
+    });
 
     // 禁用基准配置
     if (benchmarkSwitch) {
@@ -130,8 +142,9 @@ describe('BacktestSection - Benchmark Configuration', () => {
       expect(dataApi.list).toHaveBeenCalled();
     });
 
-    // 应该显示基准数据文件标签
-    expect(screen.getByText(/基准数据文件/)).toBeInTheDocument();
+    // 应该显示基准数据文件标签（使用 getAllByText 来处理多个匹配）
+    const labels = screen.getAllByText(/基准数据文件/);
+    expect(labels.length).toBeGreaterThan(0);
   });
 
   it('禁用基准后不应该显示数据文件选择器', async () => {

@@ -38,8 +38,9 @@ format = "pretty"
 data_path = "btc_1h.csv"
 symbol = "BTCUSDT"
 interval = "1h"
-start_time = "2024-01-01"
-end_time = "2024-12-31"
+start_time = "2025-01-01"
+end_time = "2025-11-14"
+timezone = "Asia/Shanghai"
 
   [backtest.pricing_mode]
   mode = "bid_ask"

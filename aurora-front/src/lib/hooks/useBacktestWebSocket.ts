@@ -33,7 +33,7 @@ export interface WsMessageHandlers {
   // 连接成功
   onConnected?: () => void;
   // 状态更新
-  onStatusUpdate?: (progress: number, status: TaskStatus) => void;
+  onStatusUpdate?: (progress: number, status: TaskStatus, errorMessage?: string) => void;
   // 任务完成
   onComplete?: (data?: unknown) => void;
   // 错误
@@ -159,7 +159,8 @@ export function useBacktestWebSocket(
             break;
           case 'status_update':
             if (message.progress !== undefined && message.status) {
-              onStatusUpdate?.(message.progress, message.status);
+              // 传递错误信息（如果有）
+              onStatusUpdate?.(message.progress, message.status, message.error || message.message);
             }
             break;
           case 'final':

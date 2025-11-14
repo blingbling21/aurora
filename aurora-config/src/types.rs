@@ -279,6 +279,10 @@ pub struct BacktestConfig {
     #[serde(default)]
     pub end_time: Option<String>,
 
+    /// 时区(可选，默认 UTC)，应用于 start_time 和 end_time
+    #[serde(default)]
+    pub timezone: Option<String>,
+
     /// 定价模式配置(可选)
     #[serde(default)]
     pub pricing_mode: Option<PricingModeConfig>,

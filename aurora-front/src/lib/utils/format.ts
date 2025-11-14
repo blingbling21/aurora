@@ -47,6 +47,48 @@ export function formatDate(dateString: string): string {
 }
 
 /**
+ * 将 Date 对象转换为本地时间的日期字符串（YYYY-MM-DD）
+ * 用于前端显示和存储本地日期
+ * 
+ * @param date Date 对象
+ * @returns 本地时间的日期字符串，格式：YYYY-MM-DD
+ * 
+ * @example
+ * const date = new Date(2025, 0, 1); // 2025-01-01 本地时间
+ * formatDateToLocal(date); // "2025-01-01"
+ */
+export function formatDateToLocal(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * 将本地时间的 Date 对象转换为 UTC 时间的日期字符串（YYYY-MM-DD）
+ * 用于将前端的本地时间转换为后端需要的 UTC 时间格式
+ * 
+ * @param date Date 对象（本地时间）
+ * @returns UTC 时间的日期字符串，格式：YYYY-MM-DD
+ * 
+ * @example
+ * // 假设本地时区是 UTC+8
+ * const date = new Date(2025, 0, 1, 0, 0, 0); // 2025-01-01 00:00:00 本地时间
+ * formatDateToUTC(date); // "2024-12-31" (UTC时间，减去8小时)
+ * 
+ * @example
+ * // 正午不会跨天
+ * const date = new Date(2025, 0, 1, 12, 0, 0); // 2025-01-01 12:00:00 本地时间
+ * formatDateToUTC(date); // "2025-01-01" (UTC时间，减去8小时后仍是同一天)
+ */
+export function formatDateToUTC(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * 格式化百分比
  * 
  * @param value 数值

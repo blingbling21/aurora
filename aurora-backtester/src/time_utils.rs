@@ -17,7 +17,8 @@
 //! 提供时间解析、验证和过滤功能
 
 use anyhow::{anyhow, Result};
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
+use chrono_tz::Tz;
 
 /// 解析日期字符串为毫秒时间戳
 ///
@@ -28,20 +29,52 @@ use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 /// # 参数
 ///
 /// * `date_str` - 日期字符串
+/// * `timezone` - 时区字符串（可选，默认UTC）
 ///
 /// # 返回值
 ///
-/// 返回毫秒时间戳
+/// 返回毫秒时间戳（UTC）
 pub fn parse_date_to_timestamp(date_str: &str) -> Result<i64> {
+    parse_date_to_timestamp_with_tz(date_str, None)
+}
+
+/// 解析日期字符串为毫秒时间戳（支持时区）
+///
+/// 支持格式:
+/// - YYYY-MM-DD
+/// - YYYY-MM-DD HH:MM:SS
+///
+/// # 参数
+///
+/// * `date_str` - 日期字符串
+/// * `timezone` - 时区字符串（可选，默认UTC），如 "UTC", "Asia/Shanghai"
+///
+/// # 返回值
+///
+/// 返回毫秒时间戳（UTC）
+pub fn parse_date_to_timestamp_with_tz(date_str: &str, timezone: Option<&str>) -> Result<i64> {
+    // 解析时区
+    let tz: Tz = if let Some(tz_str) = timezone {
+        tz_str.parse().map_err(|_| anyhow!("无效的时区: {}", tz_str))?
+    } else {
+        chrono_tz::UTC
+    };
+
     // 尝试解析完整的日期时间格式 (YYYY-MM-DD HH:MM:SS)
-    if let Ok(datetime) = NaiveDateTime::parse_from_str(date_str, "%Y-%m-%d %H:%M:%S") {
-        return Ok(datetime.and_utc().timestamp_millis());
+    if let Ok(naive_dt) = NaiveDateTime::parse_from_str(date_str, "%Y-%m-%d %H:%M:%S") {
+        let dt = tz.from_local_datetime(&naive_dt)
+            .single()
+            .ok_or_else(|| anyhow!("时区转换失败: {}", date_str))?;
+        return Ok(dt.timestamp_millis());
     }
 
     // 尝试解析日期格式 (YYYY-MM-DD)
     if let Ok(date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-        let datetime = date.and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
-        return Ok(datetime.and_utc().timestamp_millis());
+        let naive_dt = date.and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let dt = tz.from_local_datetime(&naive_dt)
+            .single()
+            .ok_or_else(|| anyhow!("时区转换失败: {}", date_str))?;
+        return Ok(dt.timestamp_millis());
     }
 
     Err(anyhow!(
@@ -143,15 +176,39 @@ pub fn validate_time_range(
 ///
 /// # 参数
 ///
-/// * `timestamp` - 毫秒时间戳
+/// * `timestamp` - 毫秒时间戳（UTC）
+///
+/// # 返回值
+///
+/// 返回格式化的日期字符串 (YYYY-MM-DD HH:MM:SS UTC)
+pub fn format_timestamp(timestamp: i64) -> String {
+    format_timestamp_with_tz(timestamp, None)
+}
+
+/// 格式化时间戳为可读字符串（支持时区）
+///
+/// # 参数
+///
+/// * `timestamp` - 毫秒时间戳（UTC）
+/// * `timezone` - 时区字符串（可选，默认UTC），如 "UTC", "Asia/Shanghai"
 ///
 /// # 返回值
 ///
 /// 返回格式化的日期字符串 (YYYY-MM-DD HH:MM:SS)
-pub fn format_timestamp(timestamp: i64) -> String {
-    let datetime = chrono::DateTime::from_timestamp_millis(timestamp)
+pub fn format_timestamp_with_tz(timestamp: i64, timezone: Option<&str>) -> String {
+    let utc_dt = chrono::DateTime::from_timestamp_millis(timestamp)
         .unwrap_or_else(|| chrono::Utc::now());
-    datetime.format("%Y-%m-%d %H:%M:%S").to_string()
+    
+    // 解析时区
+    let tz: Tz = if let Some(tz_str) = timezone {
+        tz_str.parse().unwrap_or(chrono_tz::UTC)
+    } else {
+        chrono_tz::UTC
+    };
+    
+    // 转换到目标时区
+    let local_dt = utc_dt.with_timezone(&tz);
+    local_dt.format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
 #[cfg(test)]
@@ -224,5 +281,49 @@ mod tests {
         let timestamp = 1704067200000i64; // 2024-01-01 00:00:00 UTC
         let formatted = format_timestamp(timestamp);
         assert!(formatted.starts_with("2024-01-01"));
+    }
+
+    #[test]
+    fn test_parse_date_with_timezone() {
+        // 测试UTC时区
+        let result = parse_date_to_timestamp_with_tz("2024-01-01 08:00:00", Some("UTC"));
+        assert!(result.is_ok());
+        let ts_utc = result.unwrap();
+
+        // 测试Asia/Shanghai时区（UTC+8）
+        let result = parse_date_to_timestamp_with_tz("2024-01-01 08:00:00", Some("Asia/Shanghai"));
+        assert!(result.is_ok());
+        let ts_shanghai = result.unwrap();
+
+        // Shanghai时间 08:00 = UTC时间 00:00，所以Shanghai的时间戳应该比UTC小8小时
+        assert_eq!(ts_utc - ts_shanghai, 8 * 3600 * 1000);
+    }
+
+    #[test]
+    fn test_format_timestamp_with_timezone() {
+        // 测试时间戳: 2024-12-31 00:00:00 UTC = 1735603200000
+        let timestamp = 1735603200000i64;
+
+        // 格式化为UTC
+        let formatted_utc = format_timestamp_with_tz(timestamp, Some("UTC"));
+        assert_eq!(formatted_utc, "2024-12-31 00:00:00");
+
+        // 格式化为Asia/Shanghai（UTC+8）
+        let formatted_shanghai = format_timestamp_with_tz(timestamp, Some("Asia/Shanghai"));
+        assert_eq!(formatted_shanghai, "2024-12-31 08:00:00");
+    }
+
+    #[test]
+    fn test_parse_date_only_with_timezone() {
+        // 测试只有日期的情况
+        let result_utc = parse_date_to_timestamp_with_tz("2024-01-01", Some("UTC"));
+        let result_shanghai = parse_date_to_timestamp_with_tz("2024-01-01", Some("Asia/Shanghai"));
+
+        assert!(result_utc.is_ok());
+        assert!(result_shanghai.is_ok());
+
+        // 2024-01-01 00:00:00 Shanghai = 2023-12-31 16:00:00 UTC
+        // 所以Shanghai的时间戳应该比UTC小8小时
+        assert_eq!(result_utc.unwrap() - result_shanghai.unwrap(), 8 * 3600 * 1000);
     }
 }

@@ -39,10 +39,16 @@ export default function HistoryPage() {
   /**
    * 加载回测任务列表
    */
-  const loadTasks = useCallback(async () => {
+  const loadTasks = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     try {
       const response = await backtestApi.list();
+      
+      // 如果请求被取消，不更新状态
+      if (signal?.aborted) {
+        return;
+      }
+      
       if (response.success && response.data) {
         // 转换API数据格式为前端期望的格式
         const convertedTasks: BacktestTask[] = response.data.map((task) => ({
@@ -60,18 +66,34 @@ export default function HistoryPage() {
         throw new Error(response.error || '加载失败');
       }
     } catch {
+      // 如果请求被取消，不显示错误
+      if (signal?.aborted) {
+        return;
+      }
+      
       addNotification({
         type: 'error',
         message: '加载历史记录失败',
       });
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   }, [addNotification]);
 
   // 组件挂载时加载任务列表
   useEffect(() => {
-    loadTasks();
+    // 创建 AbortController 用于取消请求
+    const abortController = new AbortController();
+    
+    // 执行加载
+    loadTasks(abortController.signal);
+    
+    // 清理函数：组件卸载时取消请求
+    return () => {
+      abortController.abort();
+    };
   }, [loadTasks]);
 
   /**

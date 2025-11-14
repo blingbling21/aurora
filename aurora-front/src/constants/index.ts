@@ -103,5 +103,27 @@ export const PRICING_MODE_OPTIONS = [
   { value: 'bidask', label: '买卖价差' },
 ];
 
+// 时区选项
+export const TIMEZONE_OPTIONS = [
+  { value: 'UTC', label: 'UTC (协调世界时)', offset: '+00:00' },
+  { value: 'Asia/Shanghai', label: 'Asia/Shanghai (北京时间 UTC+8)', offset: '+08:00' },
+  { value: 'Asia/Tokyo', label: 'Asia/Tokyo (东京时间 UTC+9)', offset: '+09:00' },
+  { value: 'Asia/Hong_Kong', label: 'Asia/Hong_Kong (香港时间 UTC+8)', offset: '+08:00' },
+  { value: 'Asia/Singapore', label: 'Asia/Singapore (新加坡时间 UTC+8)', offset: '+08:00' },
+  { value: 'Europe/London', label: 'Europe/London (伦敦时间 UTC+0/+1)', offset: '+00:00' },
+  { value: 'Europe/Paris', label: 'Europe/Paris (巴黎时间 UTC+1/+2)', offset: '+01:00' },
+  { value: 'America/New_York', label: 'America/New_York (纽约时间 UTC-5/-4)', offset: '-05:00' },
+  { value: 'America/Chicago', label: 'America/Chicago (芝加哥时间 UTC-6/-5)', offset: '-06:00' },
+  { value: 'America/Los_Angeles', label: 'America/Los_Angeles (洛杉矶时间 UTC-8/-7)', offset: '-08:00' },
+];
+
+/**
+ * 获取当前浏览器的时区
+ * @returns IANA 时区标识符
+ */
+export function getCurrentTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
 // API 基础路径
 export const API_BASE_URL = '/api';
