@@ -192,6 +192,11 @@ const config: Config = {
 
   preset: 'ts-jest',
 
+  // 允许转换 ES 模块
+  transformIgnorePatterns: [
+    'node_modules/(?!(lightweight-charts)/)',
+  ],
+
   // An array of regexp pattern strings that are matched against all source file paths, matched files will skip transformation
   // transformIgnorePatterns: [
   //   "\\\\node_modules\\\\",

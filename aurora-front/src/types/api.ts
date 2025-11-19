@@ -170,7 +170,25 @@ export const TaskStatusSchema = z.enum(['pending', 'running', 'completed', 'fail
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
 /**
- * 回测任务 Schema
+ * 回测任务摘要 Schema（用于列表展示，不包含完整的回测结果）
+ */
+export const BacktestTaskSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: TaskStatusSchema,
+  progress: z.number(),
+  created_at: z.string(),
+  started_at: z.string().optional(),
+  completed_at: z.string().optional(),
+  error: z.string().optional(),
+  config_path: z.string().optional(),
+  data_path: z.string().optional(),
+});
+
+export type BacktestTaskSummary = z.infer<typeof BacktestTaskSummarySchema>;
+
+/**
+ * 回测任务 Schema（包含完整的回测结果数据）
  */
 export const BacktestTaskSchema = z.object({
   id: z.string(),
@@ -183,6 +201,7 @@ export const BacktestTaskSchema = z.object({
   error: z.string().optional(),
   config_path: z.string().optional(),
   data_path: z.string().optional(),
+  result: z.any().optional(), // 完整的回测结果数据
 });
 
 export type BacktestTask = z.infer<typeof BacktestTaskSchema>;
@@ -316,7 +335,7 @@ export type DashboardStats = z.infer<typeof DashboardStatsSchema>;
  */
 export const DashboardDataSchema = z.object({
   stats: DashboardStatsSchema,
-  recent_tasks: z.array(BacktestTaskSchema),
+  recent_tasks: z.array(BacktestTaskSummarySchema),
 });
 
 export type DashboardData = z.infer<typeof DashboardDataSchema>;

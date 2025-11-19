@@ -103,3 +103,45 @@ impl BacktestTask {
         self.error = Some(error);
     }
 }
+
+/// 回测任务摘要信息（用于列表展示，不包含完整的回测结果）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BacktestTaskSummary {
+    /// 任务ID
+    pub id: Uuid,
+    /// 任务名称
+    pub name: String,
+    /// 配置文件路径
+    pub config_path: String,
+    /// 数据文件路径
+    pub data_path: String,
+    /// 任务状态
+    pub status: BacktestStatus,
+    /// 创建时间
+    pub created_at: DateTime<Utc>,
+    /// 开始时间
+    pub started_at: Option<DateTime<Utc>>,
+    /// 完成时间
+    pub completed_at: Option<DateTime<Utc>>,
+    /// 进度(0-100)
+    pub progress: u8,
+    /// 错误信息
+    pub error: Option<String>,
+}
+
+impl From<&BacktestTask> for BacktestTaskSummary {
+    fn from(task: &BacktestTask) -> Self {
+        Self {
+            id: task.id,
+            name: task.name.clone(),
+            config_path: task.config_path.clone(),
+            data_path: task.data_path.clone(),
+            status: task.status.clone(),
+            created_at: task.created_at,
+            started_at: task.started_at,
+            completed_at: task.completed_at,
+            progress: task.progress,
+            error: task.error.clone(),
+        }
+    }
+}

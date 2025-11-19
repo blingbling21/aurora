@@ -68,6 +68,40 @@ jest.mock('@/components/ui', () => ({
       {children}
     </button>
   ),
+  Tabs: ({ tabs, defaultActiveId }: { tabs: Array<{ id: string; label: string; icon?: string; content: React.ReactNode }>; defaultActiveId?: string }) => (
+    <div data-testid="tabs">
+      {tabs.map((tab) => (
+        <div key={tab.id}>
+          <button role="tab" aria-selected={tab.id === (defaultActiveId || tabs[0]?.id)}>
+            {tab.icon} {tab.label}
+          </button>
+          {tab.id === (defaultActiveId || tabs[0]?.id) && <div>{tab.content}</div>}
+        </div>
+      ))}
+    </div>
+  ),
+}));
+
+// Mock 图表组件
+jest.mock('@/components/charts', () => ({
+  EquityCurveChart: ({ data }: { data: unknown[] }) => (
+    <div data-testid="equity-curve-chart">累计净值曲线 ({data.length} 个数据点)</div>
+  ),
+  DrawdownChart: ({ data }: { data: unknown[] }) => (
+    <div data-testid="drawdown-chart">回撤曲线 ({data?.length || 0} 个数据点)</div>
+  ),
+  MonthlyReturnsHeatmap: ({ data }: { data: unknown[] }) => (
+    <div data-testid="monthly-returns-heatmap">月度收益热力图 ({data?.length || 0} 个数据点)</div>
+  ),
+  ReturnsDistribution: ({ equityCurve }: { equityCurve: unknown[] }) => (
+    <div data-testid="returns-distribution">收益分布直方图 ({equityCurve.length} 个数据点)</div>
+  ),
+  TradesPnLChart: ({ trades }: { trades: unknown[] }) => (
+    <div data-testid="trades-pnl-chart">交易盈亏分布 ({trades.length} 笔交易)</div>
+  ),
+  RollingMetricsChart: ({ data }: { data: unknown[] }) => (
+    <div data-testid="rolling-metrics-chart">滚动指标图 ({data?.length || 0} 个数据点)</div>
+  ),
 }));
 
 describe('BacktestDetailPage', () => {
@@ -560,18 +594,25 @@ describe('BacktestDetailPage', () => {
     render(<BacktestDetailPage />);
     
     await waitFor(() => {
-      const cards = screen.getAllByTestId('card');
-      const chartCard = cards.find(card => card.textContent?.includes('图表分析'));
-      expect(chartCard).toBeInTheDocument();
+      // 检查图表分析卡片标题
+      expect(screen.getByText('图表分析')).toBeInTheDocument();
+      // 检查 Tabs 组件存在
+      expect(screen.getByTestId('tabs')).toBeInTheDocument();
     });
   });
 
-  it('应该显示图表占位符', async () => {
+  it('应该显示Tab导航和图表组件', async () => {
     render(<BacktestDetailPage />);
     
     await waitFor(() => {
-      const placeholders = screen.getAllByText('图表组件 - 待实现');
-      expect(placeholders.length).toBeGreaterThan(0);
+      // 检查 Tab 导航
+      expect(screen.getByRole('tab', { name: /综合概览/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /交易细节/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /风险分析/i })).toBeInTheDocument();
+      
+      // 检查默认显示的图表组件
+      expect(screen.getByTestId('equity-curve-chart')).toBeInTheDocument();
+      expect(screen.getByText('累计净值曲线')).toBeInTheDocument();
     });
   });
 });

@@ -120,3 +120,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* 隐藏 lightweight-charts 的 TradingView 水印 */
+a[href*="tradingview"] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+.tv-lightweight-charts a {
+  display: none !important;
+  visibility: hidden !important;
+}

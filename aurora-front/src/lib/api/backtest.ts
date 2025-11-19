@@ -20,6 +20,7 @@ import { get, post, del } from './client';
 import type {
   ApiResponse,
   BacktestTask,
+  BacktestTaskSummary,
   StartBacktestRequest,
   FullBacktestResult,
 } from '@/types/api';
@@ -30,9 +31,10 @@ import type {
 export class BacktestService {
   /**
    * 获取所有回测任务列表（历史记录）
+   * 返回任务摘要列表，不包含完整的回测结果数据
    */
-  static async list(): Promise<ApiResponse<BacktestTask[]>> {
-    return get<BacktestTask[]>('/backtest/history');
+  static async list(): Promise<ApiResponse<BacktestTaskSummary[]>> {
+    return get<BacktestTaskSummary[]>('/backtest/history');
   }
 
   /**

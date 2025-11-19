@@ -97,8 +97,11 @@ export const TradeSchema = z.object({
   symbol: z.string().min(1, '交易标的不能为空'),
   price: z.number().positive('价格必须为正数'),
   quantity: z.number().positive('数量必须为正数'),
-  time: z.string().datetime('交易时间格式不正确'),
-  profit: z.number().optional(),
+  time: z.union([z.string().datetime(), z.number()], {
+    message: '交易时间必须是 ISO 字符串或 Unix 时间戳',
+  }),
+  pnl: z.number().optional(),
+  commission: z.number().min(0).optional(),
 });
 
 /**
@@ -106,8 +109,49 @@ export const TradeSchema = z.object({
  * 用于验证权益曲线数据点
  */
 export const EquityCurvePointSchema = z.object({
-  time: z.string().datetime('时间格式不正确'),
+  time: z.union([z.string().datetime(), z.number()]),
   value: z.number().min(0, '权益值不能为负数'),
+});
+
+/**
+ * 回撤序列点Schema
+ * 用于验证回撤数据点（潜水图）
+ */
+export const DrawdownPointSchema = z.object({
+  time: z.string().datetime('时间格式不正确'),
+  drawdown: z.number().max(0, '回撤值必须为负数或0'),
+});
+
+/**
+ * 月度收益Schema
+ * 用于验证月度收益数据
+ */
+export const MonthlyReturnSchema = z.object({
+  year: z.number().int('年份必须为整数'),
+  month: z.number().int('月份必须为整数').min(1).max(12),
+  return: z.number(),
+});
+
+/**
+ * 滚动指标点Schema
+ * 用于验证滚动指标数据点
+ */
+export const RollingMetricPointSchema = z.object({
+  time: z.string().datetime('时间格式不正确'),
+  volatility: z.number().min(0).optional(),
+  sharpe: z.number().optional(),
+  return: z.number().optional(),
+});
+
+/**
+ * 收益分布桶Schema
+ * 用于验证收益分布直方图数据
+ */
+export const ReturnBucketSchema = z.object({
+  min: z.number(),
+  max: z.number(),
+  count: z.number().int().min(0),
+  label: z.string(),
 });
 
 /**
@@ -119,6 +163,10 @@ export const BacktestResultSchema = z.object({
   metrics: BacktestMetricsSchema,
   equityCurve: z.array(EquityCurvePointSchema).min(1, '权益曲线不能为空'),
   trades: z.array(TradeSchema),
+  drawdownSeries: z.array(DrawdownPointSchema).optional(),
+  monthlyReturns: z.array(MonthlyReturnSchema).optional(),
+  rollingMetrics: z.array(RollingMetricPointSchema).optional(),
+  returnsDistribution: z.array(ReturnBucketSchema).optional(),
 });
 
 /**
@@ -186,6 +234,10 @@ export type DataFile = z.infer<typeof DataFileSchema>;
 export type BacktestMetrics = z.infer<typeof BacktestMetricsSchema>;
 export type Trade = z.infer<typeof TradeSchema>;
 export type EquityCurvePoint = z.infer<typeof EquityCurvePointSchema>;
+export type DrawdownPoint = z.infer<typeof DrawdownPointSchema>;
+export type MonthlyReturn = z.infer<typeof MonthlyReturnSchema>;
+export type RollingMetricPoint = z.infer<typeof RollingMetricPointSchema>;
+export type ReturnBucket = z.infer<typeof ReturnBucketSchema>;
 export type BacktestResult = z.infer<typeof BacktestResultSchema>;
 export type NavMenuItem = z.infer<typeof NavMenuItemSchema>;
 export type NotificationType = z.infer<typeof NotificationTypeSchema>;

@@ -19,8 +19,27 @@
  * 将 API 返回的 snake_case 数据转换为前端使用的 camelCase 格式
  */
 
-import { BacktestTask as ApiBacktestTask } from '@/types/api';
+import { BacktestTask as ApiBacktestTask, BacktestTaskSummary as ApiBacktestTaskSummary } from '@/types/api';
 import { BacktestTask } from '@/types/schemas';
+
+/**
+ * 将 API 返回的回测任务摘要数据转换为前端格式
+ * 
+ * @param apiTask API 返回的任务摘要数据
+ * @returns 前端使用的任务数据
+ */
+export function convertApiTaskSummaryToLocal(apiTask: ApiBacktestTaskSummary): BacktestTask {
+  return {
+    id: apiTask.id,
+    name: apiTask.name,
+    status: apiTask.status,
+    config: apiTask.config_path || '',
+    dataFile: apiTask.data_path || '',
+    progress: apiTask.progress,
+    createdAt: apiTask.created_at,
+    updatedAt: apiTask.completed_at || apiTask.started_at || apiTask.created_at,
+  };
+}
 
 /**
  * 将 API 返回的回测任务数据转换为前端格式
@@ -39,6 +58,16 @@ export function convertApiTaskToLocal(apiTask: ApiBacktestTask): BacktestTask {
     createdAt: apiTask.created_at,
     updatedAt: apiTask.completed_at || apiTask.started_at || apiTask.created_at,
   };
+}
+
+/**
+ * 批量转换 API 任务摘要数据
+ * 
+ * @param apiTasks API 返回的任务摘要列表
+ * @returns 前端使用的任务列表
+ */
+export function convertApiTaskSummariesToLocal(apiTasks: ApiBacktestTaskSummary[]): BacktestTask[] {
+  return apiTasks.map(convertApiTaskSummaryToLocal);
 }
 
 /**

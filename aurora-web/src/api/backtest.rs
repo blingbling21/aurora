@@ -25,7 +25,7 @@ use anyhow;
 
 use crate::error::{WebError, WebResult};
 use crate::models::SuccessResponse;
-use crate::state::{AppState, BacktestTask};
+use crate::state::{AppState, BacktestTask, BacktestTaskSummary};
 
 /// 回测路由
 pub fn routes() -> Router<AppState> {
@@ -41,14 +41,17 @@ pub fn routes() -> Router<AppState> {
 /// 列出所有回测任务
 async fn list_backtests(
     State(state): State<AppState>,
-) -> WebResult<Json<SuccessResponse<Vec<BacktestTask>>>> {
+) -> WebResult<Json<SuccessResponse<Vec<BacktestTaskSummary>>>> {
     debug!("列出所有回测任务");
 
     let tasks = state.backtest_tasks.read().await;
     let task_list: Vec<BacktestTask> = tasks.values().cloned().collect();
+    
+    // 转换为摘要格式（不包含完整的回测结果）
+    let task_summary_list: Vec<BacktestTaskSummary> = task_list.iter().map(|t| t.into()).collect();
 
-    info!("找到 {} 个回测任务", task_list.len());
-    Ok(Json(SuccessResponse::new(task_list)))
+    info!("找到 {} 个回测任务", task_summary_list.len());
+    Ok(Json(SuccessResponse::new(task_summary_list)))
 }
 
 /// 获取指定回测任务

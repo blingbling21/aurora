@@ -18,10 +18,89 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PageHeader, Button, Card } from '@/components/ui';
-import { BacktestResult, BacktestTask } from '@/types';
+import { PageHeader, Button, Card, Tabs } from '@/components/ui';
+import {
+  EquityCurveChart,
+  DrawdownChart,
+  MonthlyReturnsHeatmap,
+  ReturnsDistribution,
+  TradesPnLChart,
+  RollingMetricsChart,
+} from '@/components/charts';
+import { BacktestResult, BacktestTask, DrawdownPoint, MonthlyReturn } from '@/types';
 import { backtestApi } from '@/lib/api';
 import { useNotificationStore } from '@/lib/store/notificationStore';
+
+/**
+ * 计算回撤序列
+ * 
+ * 从权益曲线计算每个时间点的回撤百分比
+ */
+function calculateDrawdownSeries(equityCurve: { timestamp: number; equity: number }[]): DrawdownPoint[] {
+  if (equityCurve.length === 0) return [];
+
+  const drawdownSeries: DrawdownPoint[] = [];
+  let peak = equityCurve[0].equity;
+
+  equityCurve.forEach((point) => {
+    // 更新最高点
+    if (point.equity > peak) {
+      peak = point.equity;
+    }
+
+    // 计算回撤百分比
+    const drawdown = (point.equity - peak) / peak;
+
+    drawdownSeries.push({
+      time: new Date(point.timestamp).toISOString(),
+      drawdown,
+    });
+  });
+
+  return drawdownSeries;
+}
+
+/**
+ * 计算月度收益
+ * 
+ * 从权益曲线计算每个月的收益率
+ */
+function calculateMonthlyReturns(equityCurve: { timestamp: number; equity: number }[]): MonthlyReturn[] {
+  if (equityCurve.length === 0) return [];
+
+  // 按月分组
+  const monthlyData = new Map<string, { start: number; end: number }>();
+
+  equityCurve.forEach((point) => {
+    const date = new Date(point.timestamp);
+    const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+    if (!monthlyData.has(yearMonth)) {
+      monthlyData.set(yearMonth, { start: point.equity, end: point.equity });
+    } else {
+      const data = monthlyData.get(yearMonth)!;
+      data.end = point.equity;
+    }
+  });
+
+  // 计算每月收益率
+  const monthlyReturns: MonthlyReturn[] = [];
+  monthlyData.forEach((data, yearMonth) => {
+    const [year, month] = yearMonth.split('-').map(Number);
+    const returnPct = ((data.end - data.start) / data.start) * 100;
+
+    monthlyReturns.push({
+      year,
+      month,
+      return: returnPct,
+    });
+  });
+
+  return monthlyReturns.sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+}
 
 /**
  * 回测详情页面
@@ -113,20 +192,36 @@ export default function BacktestDetailPage() {
             maxWin: apiResult.metrics.max_win || 0,
             maxLoss: apiResult.metrics.max_loss || 0,
           },
-          equityCurve: apiResult.equity_curve.map((point) => ({
-            time: new Date(point.timestamp * 1000).toISOString(),
-            value: point.equity,
-          })),
-          trades: apiResult.trades.map((trade) => ({
+          equityCurve: apiResult.equity_curve
+            .slice()
+            .sort((a, b) => a.timestamp - b.timestamp)
+            .map((point) => ({
+              time: Math.floor(point.timestamp / 1000), // 转换为 Unix 秒级时间戳
+              value: point.equity,
+            })),
+          trades: apiResult.trades
+            .slice()
+            .sort((a, b) => a.timestamp - b.timestamp)
+            .map((trade) => ({
             id: String(trade.timestamp),
             type: trade.side === 'buy' ? 'buy' : 'sell',
             symbol: 'UNKNOWN',
             price: trade.price,
             quantity: trade.quantity,
-            time: new Date(trade.timestamp * 1000).toISOString(),
+            time: Math.floor(trade.timestamp / 1000), // 转换为 Unix 秒级时间戳
             pnl: trade.pnl,
             commission: trade.fee,
           })),
+          // 计算回撤序列（基于权益曲线）
+          drawdownSeries: calculateDrawdownSeries(
+            [...apiResult.equity_curve].sort((a, b) => a.timestamp - b.timestamp)
+          ),
+          // 计算月度收益
+          monthlyReturns: calculateMonthlyReturns(apiResult.equity_curve),
+          // 滚动指标数据（暂时为空，后续可从后端获取）
+          rollingMetrics: [],
+          // 收益分布数据（前端计算）
+          returnsDistribution: undefined,
         };
         setResult(convertedResult);
       } else {
@@ -393,34 +488,173 @@ export default function BacktestDetailPage() {
             </div>
           </Card>
 
-          {/* 图表展示区域 */}
+          {/* 图表分析 - 分Tab展示 */}
           <Card title="图表分析">
-            <div className="space-y-6">
-              <div className="p-6 bg-white rounded-lg border border-gray-200">
-                <h4 className="text-base font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">
-                  价格走势与交易点位
-                </h4>
-                <div className="h-[500px] flex items-center justify-center text-gray-400">
-                  图表组件 - 待实现
-                </div>
-              </div>
+            <Tabs
+              tabs={[
+                {
+                  id: 'overview',
+                  label: '综合概览',
+                  icon: '📈',
+                  content: (
+                    <div className="space-y-6">
+                      {/* 累计净值曲线 */}
+                      <div>
+                        <h4 className="text-base font-semibold text-gray-900 mb-4">累计净值曲线</h4>
+                        <EquityCurveChart data={result.equityCurve} />
+                      </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="p-4 bg-white rounded-lg border border-gray-200">
-                  <h5 className="text-sm font-semibold text-gray-900 mb-3">权益曲线</h5>
-                  <div className="h-[350px] flex items-center justify-center text-gray-400">
-                    图表组件 - 待实现
-                  </div>
-                </div>
+                      {/* 回撤曲线与月度收益热力图 */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div>
+                          <h5 className="text-sm font-semibold text-gray-900 mb-3">回撤曲线（潜水图）</h5>
+                          {result.drawdownSeries && result.drawdownSeries.length > 0 ? (
+                            <DrawdownChart data={result.drawdownSeries} />
+                          ) : (
+                            <div className="h-80 flex items-center justify-center text-gray-400">
+                              暂无回撤数据
+                            </div>
+                          )}
+                        </div>
 
-                <div className="p-4 bg-white rounded-lg border border-gray-200">
-                  <h5 className="text-sm font-semibold text-gray-900 mb-3">回撤曲线</h5>
-                  <div className="h-[350px] flex items-center justify-center text-gray-400">
-                    图表组件 - 待实现
-                  </div>
-                </div>
-              </div>
-            </div>
+                        <div>
+                          <h5 className="text-sm font-semibold text-gray-900 mb-3">收益分布直方图</h5>
+                          <ReturnsDistribution equityCurve={result.equityCurve} height={350} />
+                        </div>
+                      </div>
+
+                      {/* 月度收益热力图 */}
+                      {result.monthlyReturns && result.monthlyReturns.length > 0 && (
+                        <div>
+                          <h5 className="text-sm font-semibold text-gray-900 mb-3">月度收益热力图</h5>
+                          <MonthlyReturnsHeatmap data={result.monthlyReturns} height={400} />
+                        </div>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  id: 'trades',
+                  label: '交易细节',
+                  icon: '💹',
+                  content: (
+                    <div className="space-y-6">
+                      {/* 交易盈亏分布 */}
+                      <div>
+                        <h4 className="text-base font-semibold text-gray-900 mb-4">交易盈亏分布</h4>
+                        <TradesPnLChart trades={result.trades} />
+                      </div>
+
+                      {/* 交易列表 */}
+                      <div>
+                        <h4 className="text-base font-semibold text-gray-900 mb-4">交易记录</h4>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead className="bg-gray-50 border-b border-gray-200">
+                              <tr>
+                                <th className="px-4 py-2 text-left font-semibold text-gray-700">时间</th>
+                                <th className="px-4 py-2 text-left font-semibold text-gray-700">类型</th>
+                                <th className="px-4 py-2 text-right font-semibold text-gray-700">价格</th>
+                                <th className="px-4 py-2 text-right font-semibold text-gray-700">数量</th>
+                                <th className="px-4 py-2 text-right font-semibold text-gray-700">盈亏</th>
+                                <th className="px-4 py-2 text-right font-semibold text-gray-700">手续费</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {result.trades.slice(0, 100).map((trade) => (
+                                <tr key={trade.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                  <td className="px-4 py-2 text-gray-900">
+                                    {new Date(trade.time).toLocaleString('zh-CN')}
+                                  </td>
+                                  <td className="px-4 py-2">
+                                    <span
+                                      className={`px-2 py-1 rounded text-xs font-medium ${
+                                        trade.type === 'buy'
+                                          ? 'bg-green-100 text-green-700'
+                                          : 'bg-red-100 text-red-700'
+                                      }`}
+                                    >
+                                      {trade.type === 'buy' ? '买入' : '卖出'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2 text-right text-gray-900">
+                                    {trade.price.toFixed(2)}
+                                  </td>
+                                  <td className="px-4 py-2 text-right text-gray-900">
+                                    {trade.quantity.toFixed(4)}
+                                  </td>
+                                  <td
+                                    className={`px-4 py-2 text-right font-medium ${
+                                      (trade.pnl || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}
+                                  >
+                                    {trade.pnl !== undefined ? trade.pnl.toFixed(2) : '-'}
+                                  </td>
+                                  <td className="px-4 py-2 text-right text-gray-600">
+                                    {trade.commission !== undefined ? trade.commission.toFixed(2) : '-'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {result.trades.length > 100 && (
+                            <p className="text-center text-sm text-gray-500 mt-4">
+                              仅显示前 100 笔交易，共 {result.trades.length} 笔
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  id: 'risk',
+                  label: '风险分析',
+                  icon: '⚠️',
+                  content: (
+                    <div className="space-y-6">
+                      {/* 滚动指标 */}
+                      {result.rollingMetrics && result.rollingMetrics.length > 0 ? (
+                        <div>
+                          <h4 className="text-base font-semibold text-gray-900 mb-4">滚动波动率与夏普比率</h4>
+                          <RollingMetricsChart data={result.rollingMetrics} />
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 text-gray-400">
+                          滚动指标数据暂未计算，可在后续版本中添加
+                        </div>
+                      )}
+
+                      {/* 风险指标卡片 */}
+                      <div>
+                        <h4 className="text-base font-semibold text-gray-900 mb-4">风险指标</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                            <p className="text-sm text-gray-600 mb-1">最大回撤</p>
+                            <p className="text-2xl font-bold text-red-600">
+                              {result.metrics.maxDrawdown.toFixed(2)}%
+                            </p>
+                          </div>
+                          <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                            <p className="text-sm text-gray-600 mb-1">回撤持续时间</p>
+                            <p className="text-2xl font-bold text-orange-600">
+                              {result.metrics.maxDrawdownDuration.toFixed(0)} 天
+                            </p>
+                          </div>
+                          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p className="text-sm text-gray-600 mb-1">年化波动率</p>
+                            <p className="text-2xl font-bold text-yellow-700">
+                              {result.metrics.annualizedVolatility.toFixed(2)}%
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ),
+                },
+              ]}
+              defaultActiveId="overview"
+            />
           </Card>
         </div>
       )}

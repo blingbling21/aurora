@@ -23,6 +23,7 @@ import { TaskItem } from '@/components/dashboard';
 import { BacktestTask } from '@/types';
 import { backtestApi } from '@/lib/api';
 import { useNotificationStore } from '@/lib/store/notificationStore';
+import { convertApiTaskSummariesToLocal } from '@/lib/utils/apiConverters';
 
 /**
  * 历史记录列表页面
@@ -50,17 +51,8 @@ export default function HistoryPage() {
       }
       
       if (response.success && response.data) {
-        // 转换API数据格式为前端期望的格式
-        const convertedTasks: BacktestTask[] = response.data.map((task) => ({
-          id: task.id,
-          name: task.name,
-          status: task.status,
-          config: task.config_path || '',
-          dataFile: task.data_path || '',
-          progress: task.progress,
-          createdAt: task.created_at,
-          updatedAt: task.completed_at || task.started_at || task.created_at,
-        }));
+        // 使用转换工具将 API 数据转换为前端格式
+        const convertedTasks = convertApiTaskSummariesToLocal(response.data);
         setTasks(convertedTasks);
       } else {
         throw new Error(response.error || '加载失败');

@@ -18,7 +18,7 @@ import { create } from 'zustand';
 import { DashboardStats } from '@/types/api';
 import { BacktestTask } from '@/types/schemas';
 import { DashboardService } from '@/lib/api/dashboard';
-import { convertApiTasksToLocal } from '@/lib/utils/apiConverters';
+import { convertApiTaskSummariesToLocal } from '@/lib/utils/apiConverters';
 
 /**
  * 仪表盘状态接口
@@ -77,7 +77,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         // 更新状态，转换 API 数据为前端格式
         set({
           stats: response.data.stats,
-          recentTasks: convertApiTasksToLocal(response.data.recent_tasks),
+          recentTasks: convertApiTaskSummariesToLocal(response.data.recent_tasks),
           isLoading: false,
           error: null,
         });

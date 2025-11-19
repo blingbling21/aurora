@@ -18,6 +18,8 @@ export { Button } from './Button';
 export { Card } from './Card';
 export { PageHeader } from './PageHeader';
 export { Notification, NotificationContainer } from './Notification';
+export { Tabs } from './Tabs';
+export type { TabItem, TabsProps } from './Tabs';
 export { Input } from './input';
 export { Textarea } from './textarea';
 export { DatePicker } from './date-picker';

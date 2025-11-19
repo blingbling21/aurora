@@ -35,6 +35,7 @@ export type {
   Kline,
   TaskStatus as ApiTaskStatus,
   BacktestTask as ApiBacktestTask,
+  BacktestTaskSummary as ApiBacktestTaskSummary,
   StartBacktestRequest,
   BacktestMetrics as ApiBacktestMetrics,
   EquityPoint,

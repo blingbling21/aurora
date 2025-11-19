@@ -23,7 +23,7 @@ use uuid::Uuid;
 pub mod backtest;
 pub mod download;
 
-pub use backtest::{BacktestTask, BacktestStatus};
+pub use backtest::{BacktestTask, BacktestTaskSummary, BacktestStatus};
 pub use download::{DownloadTask, DownloadStatus};
 
 /// 应用全局状态

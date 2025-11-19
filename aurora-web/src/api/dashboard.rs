@@ -20,7 +20,7 @@ use tracing::{debug, info};
 
 use crate::error::WebResult;
 use crate::models::SuccessResponse;
-use crate::state::{AppState, BacktestTask, BacktestStatus};
+use crate::state::{AppState, BacktestTask, BacktestTaskSummary, BacktestStatus};
 
 /// 仪表盘路由
 pub fn routes() -> Router<AppState> {
@@ -40,7 +40,7 @@ pub struct DashboardStats {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DashboardData {
     pub stats: DashboardStats,
-    pub recent_tasks: Vec<BacktestTask>,
+    pub recent_tasks: Vec<BacktestTaskSummary>,
 }
 
 /// 获取仪表盘数据
@@ -65,10 +65,13 @@ async fn get_dashboard_data(
     let mut recent_tasks = all_tasks;
     recent_tasks.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     recent_tasks.truncate(10);
+    
+    // 转换为摘要格式（不包含完整的回测结果）
+    let recent_tasks_summary: Vec<BacktestTaskSummary> = recent_tasks.iter().map(|t| t.into()).collect();
 
     let dashboard_data = DashboardData {
         stats,
-        recent_tasks,
+        recent_tasks: recent_tasks_summary,
     };
 
     info!(
